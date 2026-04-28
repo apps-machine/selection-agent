@@ -1,0 +1,60 @@
+{
+  "name": "@apps-machine/selection-agent",
+  "version": "0.0.1",
+  "description": "Apps Machine \u2014 Selection Agent. Ranks app opportunities globally via dual-store (Apple App Store + Google Play) scraping, heuristic scoring, and Claude judges. Run `npx @apps-machine/selection-agent demo` for a 30s magical moment.",
+  "type": "module",
+  "bin": {
+    "selection-agent": "./src/cli/index.ts"
+  },
+  "main": "./src/cli/index.ts",
+  "files": [
+    "src",
+    "LICENSE",
+    "README.md"
+  ],
+  "scripts": {
+    "demo": "bun src/cli/index.ts demo",
+    "scan": "bun src/cli/index.ts scan",
+    "snapshot": "bun src/cli/index.ts snapshot",
+    "report": "bun src/cli/index.ts report",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "evals": "bun test evals",
+    "prepare": "[ -d .git ] && git config core.hooksPath .githooks 2>/dev/null || true"
+  },
+  "keywords": [
+    "apps-machine",
+    "app-store",
+    "google-play",
+    "selection",
+    "agent",
+    "claude",
+    "anthropic",
+    "indie-hackers"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/apps-machine/selection-agent.git"
+  },
+  "homepage": "https://github.com/apps-machine/selection-agent#readme",
+  "bugs": {
+    "url": "https://github.com/apps-machine/selection-agent/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "bun": ">=1.0.0"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "~0.30.0",
+    "citty": "^0.1.6",
+    "pino": "^9.5.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.5.0"
+  }
+}

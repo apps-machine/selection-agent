@@ -1,0 +1,43 @@
+{
+  "generatedAt": "2026-04-28T00:00:00.000Z",
+  "marketsScanned": 6,
+  "candidatesEvaluated": 50,
+  "topCandidates": [
+    {
+      "rank": 1,
+      "appName": "PlantSnap (clone target)",
+      "store": "apple",
+      "market": "BR",
+      "category": "Reference",
+      "estimatedRevenueUsd": 4200000,
+      "localizationGap": 8,
+      "paywallComplexity": 3,
+      "compositeScore": 8.7,
+      "reasoning": "English-only listing in Brazil despite US revenue $4M+. Paywall is simple weekly sub with no PIX integration. High loc gap × low paywall complexity = strong clone candidate."
+    },
+    {
+      "rank": 2,
+      "appName": "Calorie Tracker AI",
+      "store": "google",
+      "market": "MX",
+      "category": "Health & Fitness",
+      "estimatedRevenueUsd": 2800000,
+      "localizationGap": 7,
+      "paywallComplexity": 4,
+      "compositeScore": 8.1,
+      "reasoning": "Spanish copy is machine-translated (back-translation accuracy 62%, fails ≥8/10 lang quality threshold). Screenshots show US food only — strong cultural mismatch."
+    },
+    {
+      "rank": 3,
+      "appName": "Sleep Coach Pro",
+      "store": "apple",
+      "market": "JP",
+      "category": "Health & Fitness",
+      "estimatedRevenueUsd": 1900000,
+      "localizationGap": 9,
+      "paywallComplexity": 2,
+      "compositeScore": 8.0,
+      "reasoning": "Zero Japanese localization, 1.9M revenue from English speakers in JP market. Paywall is single tier, easy to clone with localized variants."
+    }
+  ]
+}
