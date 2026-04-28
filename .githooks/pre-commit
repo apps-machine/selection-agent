@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -e
+if command -v gitleaks >/dev/null 2>&1; then
+  gitleaks protect --staged --redact --no-banner
+else
+  echo "warning: gitleaks not installed (brew install gitleaks). Skipping secret scan." >&2
+fi
