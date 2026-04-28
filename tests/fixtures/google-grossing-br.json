@@ -1,0 +1,32 @@
+[
+  {
+    "appId": "com.duolingo.app",
+    "title": "Duolingo: idiomas grátis",
+    "developer": "Duolingo",
+    "genre": "Education",
+    "price": 0,
+    "currency": "USD",
+    "free": true,
+    "score": 4.6,
+    "reviews": 18500000,
+    "ratings": 18500000,
+    "icon": "https://example.com/duolingo-icon.png",
+    "summary": "Aprenda idiomas grátis com aulas divertidas.",
+    "released": "Nov 12, 2012",
+    "updated": "Apr 20, 2026"
+  },
+  {
+    "appId": "com.kwai",
+    "title": "Kwai - vídeos curtos",
+    "developer": "Kwai Inc.",
+    "genre": "Social",
+    "free": true,
+    "score": 4.4,
+    "reviews": 9200000,
+    "ratings": 9200000,
+    "icon": "https://example.com/kwai-icon.png",
+    "summary": "Assista e crie vídeos curtos.",
+    "released": "Jul 24, 2017",
+    "updated": "Apr 25, 2026"
+  }
+]

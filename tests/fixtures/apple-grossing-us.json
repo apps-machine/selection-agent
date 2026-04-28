@@ -1,0 +1,40 @@
+[
+  {
+    "id": 1604029305,
+    "appId": "com.calai.calai",
+    "title": "Cal AI: Calorie Tracker",
+    "developer": "Cal AI Inc.",
+    "primaryGenre": "Health & Fitness",
+    "genre": "Health & Fitness",
+    "price": 0,
+    "currency": "USD",
+    "free": true,
+    "score": 4.7,
+    "reviews": 89432,
+    "ratings": 89432,
+    "icon": "https://example.com/calai-icon.png",
+    "screenshots": [
+      "https://example.com/calai-1.png",
+      "https://example.com/calai-2.png"
+    ],
+    "released": "2023-01-01T00:00:00Z",
+    "updated": "2026-04-01T00:00:00Z"
+  },
+  {
+    "id": 1601564000,
+    "appId": "com.remini.remini",
+    "title": "Remini - AI Photo Enhancer",
+    "developer": "Bending Spoons",
+    "primaryGenre": "Photo & Video",
+    "price": 0,
+    "currency": "USD",
+    "free": true,
+    "score": 4.5,
+    "reviews": 230000,
+    "ratings": 230000,
+    "icon": "https://example.com/remini-icon.png",
+    "screenshots": ["https://example.com/remini-1.png"],
+    "released": "2019-06-15T00:00:00Z",
+    "updated": "2026-04-15T00:00:00Z"
+  }
+]
