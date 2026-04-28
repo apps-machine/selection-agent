@@ -3,7 +3,13 @@
 > Rank app opportunities globally — across 50+ markets, dual-store (Apple App Store + Google Play) — by localization gap, paywall complexity, estimated revenue, and Claude judges (text + vision).
 
 ```bash
+# After npm publish (lands in milestone M7):
 npx @apps-machine/selection-agent demo
+
+# Pre-publish (today): clone + run via Bun
+git clone https://github.com/apps-machine/selection-agent && cd selection-agent
+bun install
+bun src/cli/index.ts demo
 ```
 
 Zero config, no API key. ~30s to your first ranked brief from cached data.
@@ -30,14 +36,14 @@ Requires [Bun](https://bun.sh) ≥ 1.0.
 ## Commands
 
 ```bash
-selection-agent demo                       # cached snapshot, no API key
-selection-agent scan                        # live dual-store scan (needs ANTHROPIC_API_KEY)
-selection-agent scan --no-llm               # heuristics only
-selection-agent scan --top 50               # limit candidates
-selection-agent scan --format json          # JSON output
-selection-agent snapshot                    # daily Track B writer
-selection-agent report --compare-judges     # text vs vision judge divergence
-selection-agent --help                      # full help
+selection-agent demo                       # cached snapshot, no API key — works today
+selection-agent scan                        # live dual-store scan (M2-M6, needs ANTHROPIC_API_KEY)
+selection-agent scan --no-llm               # heuristics only (M3)
+selection-agent scan --top 50               # limit candidates (M2)
+selection-agent scan --format json          # JSON output (M2)
+selection-agent snapshot                    # daily Track B writer (M5)
+selection-agent report --compare-judges     # text vs vision judge divergence (M6)
+selection-agent --help                      # full help — works today
 ```
 
 The agent ranks markets globally — there is no `--market BR` flag. Filter via your founder risk thresholds (e.g., 3 simultaneous markets max, lang quality ≥ 8/10) downstream.

@@ -25,7 +25,17 @@ const main = defineCommand({
         },
       },
       async run({ args }) {
-        await runDemo({ format: args.format as "markdown" | "json" });
+        if (args.format !== "markdown" && args.format !== "json") {
+          console.error(formatError({
+            code: "INVALID_FORMAT",
+            message: `unknown --format value "${args.format}"`,
+            cause: "--format accepts 'markdown' or 'json'",
+            fix: "rerun with --format markdown (default) or --format json",
+            docs: "https://github.com/apps-machine/selection-agent#commands",
+          }));
+          process.exit(2);
+        }
+        await runDemo({ format: args.format });
       },
     }),
     scan: defineCommand({
