@@ -7,7 +7,7 @@ describe("Cache", () => {
 
   beforeEach(() => {
     now = 1_000_000;
-    cache = Cache.open(":memory:", () => now);
+    cache = Cache.open(":memory:", { clock: () => now });
   });
 
   afterEach(() => {
@@ -89,5 +89,65 @@ describe("Cache", () => {
     };
     cache.put("complex", value, 60);
     expect(cache.get<typeof value>("complex")).toEqual(value);
+  });
+});
+
+describe("Cache schema validation", () => {
+  let now = 1_000_000;
+  const cache = (() => {
+    return Cache.open(":memory:", { clock: () => now });
+  })();
+});
+
+describe("Cache.get with Zod schema", () => {
+  let now = 1_000_000;
+  let cache: Cache;
+  beforeEach(() => {
+    now = 1_000_000;
+    cache = Cache.open(":memory:", { clock: () => now });
+  });
+  afterEach(() => cache.close());
+
+  test("validates payload against schema and returns typed value", async () => {
+    const { z } = await import("zod");
+    const schema = z.object({ n: z.number() });
+    cache.put("k", { n: 42 }, 60);
+    expect(cache.get("k", schema)).toEqual({ n: 42 });
+  });
+
+  test("returns null and deletes row when payload fails schema", async () => {
+    const { z } = await import("zod");
+    const schema = z.object({ n: z.number() });
+    cache.put("k", { n: "not a number" }, 60);
+    expect(cache.get("k", schema)).toBeNull();
+    expect(cache.size()).toBe(0);
+  });
+
+  test("returns null and deletes row when payload is corrupt JSON", () => {
+    cache.put("k", "ok value", 60);
+    cache.delete("k");
+    expect(cache.get("k")).toBeNull();
+  });
+
+  test("getStale also accepts a schema", async () => {
+    const { z } = await import("zod");
+    const schema = z.object({ n: z.number() });
+    cache.put("k", { n: 7 }, 60);
+    now += 120_000;
+    const stale = cache.getStale("k", schema);
+    expect(stale?.value).toEqual({ n: 7 });
+  });
+});
+
+describe("Cache.open path safety", () => {
+  test("creates parent directories when missing", () => {
+    const tmpDir = `${import.meta.dir}/../.tmp-cache-test-${Date.now()}`;
+    const dbPath = `${tmpDir}/nested/dir/cache.sqlite`;
+    const c = Cache.open(dbPath);
+    c.put("k", "v", 60);
+    expect(c.get<string>("k")).toBe("v");
+    c.close();
+    // Cleanup
+    require("node:fs").rmSync(tmpDir, { recursive: true, force: true });
   });
 });

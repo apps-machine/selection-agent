@@ -1,4 +1,4 @@
-import { isTransientHttpError, retryWithBackoff, type RetryOptions } from "./retry.ts";
+import { isFatalHttpError, isTransientHttpError, retryWithBackoff, type RetryOptions } from "./retry.ts";
 
 export type ResilientSource =
   | "primary"
@@ -36,6 +36,12 @@ export interface ResilientOptions {
     ctx?: Record<string, unknown>,
   ) => void;
   clock?: () => number;
+  /**
+   * Maximum age (ms) of a stale cache entry that is still considered acceptable
+   * as a fallback. Older entries are treated as if no cache existed.
+   * Default: undefined (no cap — any stale entry is served).
+   */
+  maxStaleMs?: number;
 }
 
 const noopLogger: NonNullable<ResilientOptions["logger"]> = () => {};
@@ -64,8 +70,12 @@ export async function resilient<T>(
 
   try {
     const value = await retryWithBackoff(tiers.primary, {
-      shouldRetry: isTransientHttpError,
       ...opts.retry,
+      shouldRetry: (e, attempt) => {
+        if (isFatalHttpError(e)) return false;
+        if (opts.retry?.shouldRetry) return opts.retry.shouldRetry(e, attempt);
+        return isTransientHttpError(e);
+      },
     });
     tiers.cache.put(value);
     return { value, source: "primary", errors };
@@ -90,16 +100,23 @@ export async function resilient<T>(
   const stale = tiers.cache.getStale();
   if (stale) {
     const ageMs = clock() - stale.createdAt;
-    log("warn", "all tiers failed; serving stale cache", {
-      staleAgeMs: ageMs,
-      errors: errors.map((e) => e.message),
-    });
-    return {
-      value: stale.value,
-      source: "cache-stale",
-      staleAgeMs: ageMs,
-      errors,
-    };
+    if (opts.maxStaleMs !== undefined && ageMs > opts.maxStaleMs) {
+      log("warn", "stale cache rejected (over maxStaleMs)", {
+        staleAgeMs: ageMs,
+        maxStaleMs: opts.maxStaleMs,
+      });
+    } else {
+      log("warn", "all tiers failed; serving stale cache", {
+        staleAgeMs: ageMs,
+        errors: errors.map((e) => e.message),
+      });
+      return {
+        value: stale.value,
+        source: "cache-stale",
+        staleAgeMs: ageMs,
+        errors,
+      };
+    }
   }
 
   const last = errors[errors.length - 1] ?? new Error("resilient: all tiers failed");

@@ -133,3 +133,40 @@ describe("isTransientHttpError", () => {
     expect(isTransientHttpError("plain string")).toBe(false);
   });
 });
+
+import { isFatalHttpError } from "../../src/util/retry.ts";
+
+describe("isFatalHttpError", () => {
+  test("flags 401 + 403 + 451", () => {
+    expect(isFatalHttpError({ status: 401 })).toBe(true);
+    expect(isFatalHttpError({ status: 403 })).toBe(true);
+    expect(isFatalHttpError({ status: 451 })).toBe(true);
+  });
+  test("flags 404 + 410", () => {
+    expect(isFatalHttpError({ status: 404 })).toBe(true);
+    expect(isFatalHttpError({ status: 410 })).toBe(true);
+  });
+  test("does not flag 429 or 5xx", () => {
+    expect(isFatalHttpError({ status: 429 })).toBe(false);
+    expect(isFatalHttpError({ status: 503 })).toBe(false);
+  });
+  test("returns false for non-HTTP errors", () => {
+    expect(isFatalHttpError(new Error("ECONNRESET"))).toBe(false);
+    expect(isFatalHttpError(null)).toBe(false);
+  });
+});
+
+describe("isTransientHttpError extended patterns", () => {
+  test("flags ENOTFOUND", () => {
+    expect(isTransientHttpError({ message: "getaddrinfo ENOTFOUND" })).toBe(true);
+  });
+  test("flags ECONNREFUSED", () => {
+    expect(isTransientHttpError({ message: "connect ECONNREFUSED 127.0.0.1" })).toBe(true);
+  });
+  test("flags socket hang up", () => {
+    expect(isTransientHttpError({ message: "socket hang up" })).toBe(true);
+  });
+  test("flags undici UND_ERR_*", () => {
+    expect(isTransientHttpError({ message: "UND_ERR_CONNECT_TIMEOUT" })).toBe(true);
+  });
+});

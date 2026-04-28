@@ -21,13 +21,21 @@ export interface ReviewScraperLib {
   }): Promise<unknown[]>;
 }
 
+import { buildCacheKey } from "../storage/cache-key.ts";
+
 function reviewCacheKey(
   store: Store,
   market: string,
   appId: string,
   page: number,
 ): string {
-  return `reviews:${store}:${market.toLowerCase()}:${appId}:p${page}`;
+  return buildCacheKey(
+    "reviews",
+    store,
+    market.toLowerCase(),
+    appId,
+    `p${page}`,
+  );
 }
 
 function normalizeReview(

@@ -32,8 +32,15 @@ export interface AppScrapeOutcome {
   source: "primary" | "fallback" | "cache-fresh" | "cache-stale";
 }
 
+import { buildCacheKey } from "../storage/cache-key.ts";
+
 function appCacheKey(job: AppScrapeJob): string {
-  return `app:${job.store}:${job.market.toLowerCase()}:${job.appId}`;
+  return buildCacheKey(
+    "app",
+    job.store,
+    job.market.toLowerCase(),
+    job.appId,
+  );
 }
 
 function cacheAdapter(

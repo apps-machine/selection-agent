@@ -38,8 +38,16 @@ export interface ChartScrapeReport {
   failures: Array<{ job: ChartScrapeJob; error: Error }>;
 }
 
+import { buildCacheKey } from "../storage/cache-key.ts";
+
 function chartCacheKey(job: ChartScrapeJob): string {
-  return `chart:${job.store}:${job.market.toLowerCase()}:${job.collection}:${job.limit}`;
+  return buildCacheKey(
+    "chart",
+    job.store,
+    job.market.toLowerCase(),
+    job.collection,
+    job.limit,
+  );
 }
 
 function cacheAdapter(

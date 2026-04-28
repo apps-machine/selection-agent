@@ -197,3 +197,69 @@ describe("resilient", () => {
     expect(events.some((e) => e.msg.includes("stale cache"))).toBe(true);
   });
 });
+
+describe("resilient — isFatalHttpError short-circuit", () => {
+  test("does not retry on 403 (auth revoked)", async () => {
+    const cache = makeCache<string>();
+    let calls = 0;
+    await expect(
+      resilient(
+        {
+          primary: async () => {
+            calls++;
+            const e = new Error("forbidden") as Error & { status?: number };
+            e.status = 403;
+            throw e;
+          },
+          cache,
+        },
+        { retry: { initialDelayMs: 1, maxDelayMs: 5, jitter: false, maxAttempts: 5 } },
+      ),
+    ).rejects.toThrow("forbidden");
+    expect(calls).toBe(1);
+  });
+});
+
+describe("resilient — maxStaleMs cap", () => {
+  test("rejects stale cache older than maxStaleMs", async () => {
+    const cache = makeCache<string>({ value: "ancient", createdAt: 0 });
+    cache.fresh = false;
+    await expect(
+      resilient(
+        {
+          primary: async () => {
+            throw new Error("primary down");
+          },
+          cache,
+          clock: () => 10_000,
+        } as Parameters<typeof resilient<string>>[0],
+        {
+          retry: { initialDelayMs: 1, maxDelayMs: 5, jitter: false, maxAttempts: 1 },
+          maxStaleMs: 5_000,
+          clock: () => 10_000,
+        },
+      ),
+    ).rejects.toThrow("primary down");
+  });
+
+  test("accepts stale cache within maxStaleMs", async () => {
+    const cache = makeCache<string>({ value: "still-ok", createdAt: 7_000 });
+    cache.fresh = false;
+    const r = await resilient(
+      {
+        primary: async () => {
+          throw new Error("primary down");
+        },
+        cache,
+        clock: () => 10_000,
+      } as Parameters<typeof resilient<string>>[0],
+      {
+        retry: { initialDelayMs: 1, maxDelayMs: 5, jitter: false, maxAttempts: 1 },
+        maxStaleMs: 5_000,
+        clock: () => 10_000,
+      },
+    );
+    expect(r.source).toBe("cache-stale");
+    expect(r.value).toBe("still-ok");
+  });
+});

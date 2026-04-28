@@ -31,7 +31,9 @@ export async function retryWithBackoff<T>(
         merged.initialDelayMs * 2 ** (attempt - 1),
         merged.maxDelayMs,
       );
-      const delay = merged.jitter ? exp * (0.5 + Math.random() * 0.5) : exp;
+      // Full jitter (Math.random() * exp) avoids thundering-herd retry clustering
+      // when multiple parallel jobs hit the same 429 simultaneously.
+      const delay = merged.jitter ? Math.random() * exp : exp;
       opts.onRetry?.(e, attempt, delay);
       await new Promise((r) => setTimeout(r, delay));
     }
@@ -39,14 +41,38 @@ export async function retryWithBackoff<T>(
   throw lastError;
 }
 
+function extractStatus(err: unknown): number | undefined {
+  if (!err || typeof err !== "object") return undefined;
+  const o = err as {
+    status?: number;
+    statusCode?: number;
+    response?: { status?: number };
+  };
+  return o.status ?? o.statusCode ?? o.response?.status;
+}
+
 export function isTransientHttpError(err: unknown): boolean {
-  if (!err || typeof err !== "object") return false;
-  const status = (err as { status?: number; statusCode?: number; response?: { status?: number } }).status
-    ?? (err as { statusCode?: number }).statusCode
-    ?? (err as { response?: { status?: number } }).response?.status;
+  const status = extractStatus(err);
   if (typeof status === "number") {
     return status === 429 || status === 503 || (status >= 500 && status < 600);
   }
-  const msg = (err as { message?: string }).message ?? "";
-  return /ECONNRESET|ETIMEDOUT|ENETUNREACH|EAI_AGAIN/.test(msg);
+  const msg = (err && typeof err === "object" && "message" in err
+    ? String((err as { message: unknown }).message)
+    : "");
+  return /ECONNRESET|ETIMEDOUT|ENETUNREACH|EAI_AGAIN|ECONNREFUSED|ENOTFOUND|socket hang up|UND_ERR_/i.test(
+    msg,
+  );
+}
+
+/**
+ * Permanent failures that should abort retries immediately:
+ *   - 401/403: auth revoked or forbidden (won't recover)
+ *   - 404: resource gone
+ *   - 410: gone (deprecated)
+ *   - 451: legal block
+ */
+export function isFatalHttpError(err: unknown): boolean {
+  const status = extractStatus(err);
+  if (typeof status !== "number") return false;
+  return [401, 403, 404, 410, 451].includes(status);
 }

@@ -1,5 +1,13 @@
 import { Database } from "bun:sqlite";
+import { mkdirSync } from "node:fs";
+import { dirname } from "node:path";
+import type { ZodType } from "zod";
 import { ALL_SCHEMAS } from "./schema.ts";
+import { assertDiskSpace, MIN_DISK_BYTES_DEFAULT } from "./disk.ts";
+
+function ensureParentDir(path: string): void {
+  mkdirSync(dirname(path), { recursive: true });
+}
 
 export interface CacheEntry<T> {
   value: T;
@@ -13,7 +21,18 @@ export class Cache {
     private readonly clock: () => number,
   ) {}
 
-  static open(path: string, clock: () => number = Date.now): Cache {
+  static open(
+    path: string,
+    opts: { clock?: () => number; minFreeBytes?: number } = {},
+  ): Cache {
+    const clock = opts.clock ?? Date.now;
+    if (path !== ":memory:") {
+      ensureParentDir(path);
+      assertDiskSpace(
+        dirname(path),
+        opts.minFreeBytes ?? MIN_DISK_BYTES_DEFAULT,
+      );
+    }
     const db = new Database(path, { create: true, strict: true });
     db.exec("PRAGMA journal_mode = WAL");
     db.exec("PRAGMA synchronous = NORMAL");
@@ -40,7 +59,12 @@ export class Cache {
       .run({ key, payload, expires: expiresAt, now });
   }
 
-  get<T>(key: string): T | null {
+  /**
+   * Read a cached value. If `schema` is provided, the parsed JSON is validated
+   * against it; on validation failure the row is deleted and `null` is returned
+   * (treats it as a stale-format entry that needs rescraping).
+   */
+  get<T>(key: string, schema?: ZodType<T>): T | null {
     const now = this.clock();
     const row = this.db
       .prepare<{
@@ -53,10 +77,36 @@ export class Cache {
       )
       .get({ key, now });
     if (!row) return null;
-    return JSON.parse(row.payload) as T;
+    return this.parsePayload<T>(key, row.payload, schema);
   }
 
-  getEntry<T>(key: string): CacheEntry<T> | null {
+  private parsePayload<T>(
+    key: string,
+    payload: string,
+    schema?: ZodType<T>,
+  ): T | null {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(payload);
+    } catch {
+      this.delete(key);
+      return null;
+    }
+    if (!schema) return parsed as T;
+    const r = schema.safeParse(parsed);
+    if (!r.success) {
+      this.delete(key);
+      return null;
+    }
+    return r.data;
+  }
+
+  delete(key: string): void {
+    this.db.prepare("DELETE FROM scrape_cache WHERE cache_key = $key")
+      .run({ key });
+  }
+
+  getEntry<T>(key: string, schema?: ZodType<T>): CacheEntry<T> | null {
     const now = this.clock();
     const row = this.db
       .prepare<{
@@ -70,15 +120,17 @@ export class Cache {
       )
       .get({ key, now });
     if (!row) return null;
+    const value = this.parsePayload<T>(key, row.payload, schema);
+    if (value === null) return null;
     return {
-      value: JSON.parse(row.payload) as T,
+      value,
       expiresAt: row.expires_at,
       createdAt: row.created_at,
     };
   }
 
   /** Returns the entry even if expired — useful for stale-fallback on scrape failure. */
-  getStale<T>(key: string): CacheEntry<T> | null {
+  getStale<T>(key: string, schema?: ZodType<T>): CacheEntry<T> | null {
     const row = this.db
       .prepare<{
         payload: string;
@@ -91,8 +143,10 @@ export class Cache {
       )
       .get({ key });
     if (!row) return null;
+    const value = this.parsePayload<T>(key, row.payload, schema);
+    if (value === null) return null;
     return {
-      value: JSON.parse(row.payload) as T,
+      value,
       expiresAt: row.expires_at,
       createdAt: row.created_at,
     };
