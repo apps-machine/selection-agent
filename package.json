@@ -1,7 +1,7 @@
 {
   "name": "@apps-machine/selection-agent",
   "version": "0.0.1",
-  "description": "Apps Machine \u2014 Selection Agent. Ranks app opportunities globally via dual-store (Apple App Store + Google Play) scraping, heuristic scoring, and Claude judges. Run `npx @apps-machine/selection-agent demo` for a 30s magical moment.",
+  "description": "Apps Machine — Selection Agent. Ranks app opportunities globally via dual-store (Apple App Store + Google Play) scraping, heuristic scoring, and Claude judges. Run `npx @apps-machine/selection-agent demo` for a 30s magical moment.",
   "type": "module",
   "bin": {
     "selection-agent": "./src/cli/index.ts"
@@ -49,12 +49,15 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "~0.30.0",
+    "app-store-scraper": "^0.18.0",
     "citty": "^0.1.6",
+    "google-play-scraper": "^10.1.2",
     "pino": "^9.5.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/bun": "latest",
+    "playwright": "^1.59.1",
     "typescript": "^5.5.0"
   }
 }
