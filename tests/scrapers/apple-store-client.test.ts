@@ -34,7 +34,10 @@ describe("apple-store-client", () => {
       collection: "top-grossing",
       limit: 200,
     });
-    expect(captured.args?.collection).toBe("TOP_GROSSING_IOS");
+    // The lib's `list()` validates against its own enum *values* (e.g.
+    // "topGrossing" / "topgrossingapplications"), not the key string. We
+    // look up the value on `lib.collection` before passing it through.
+    expect(captured.args?.collection).toBe("topGrossing");
     expect(captured.args?.country).toBe("us");
     expect(captured.args?.num).toBe(200);
     expect(entries.length).toBe(2);

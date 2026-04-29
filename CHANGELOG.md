@@ -5,6 +5,21 @@ All notable changes to `@apps-machine/selection-agent` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.1] - 2026-04-29
+
+M6 smoke-test fallout. Three bugs surfaced when running `selection-agent scan --no-llm --markets us --stores apple` against real Apple data — none of them were caught by M6's unit tests (all unit tests use injected fakes that don't replicate the upstream lib's runtime quirks). Track B was silently dead in production until this release.
+
+### Fixed
+
+- **CLI `--no-llm` flag was silently ignored.** citty's `--no-X` convention sets `args.X = false` (NOT `args["no-X"] = true`). The CLI declared `"no-llm"` and read `args["no-llm"]`, which always evaluated to its default (`false`), so `--no-llm` had no effect and the pre-flight always demanded `ANTHROPIC_API_KEY`. Renamed the flag declaration to `llm: { default: true }` so passing `--no-llm` cleanly flips it. Two regression tests in `tests/cli.test.ts` invoke the CLI as a subprocess and assert (a) `--no-llm` does NOT trigger MISSING_API_KEY, (b) omitting both env var and `--no-llm` still rejects via pre-flight.
+- **Apple chart scraper threw `Invalid collection TOP_GROSSING_IOS` against the real lib.** `app-store-scraper`'s `list({collection})` validates against its own enum *values* (e.g., `"topgrossingapplications"`), not the key strings (`"TOP_GROSSING_IOS"`). M2 passed the key string verbatim, which the lib rejects. Now we look up the value on `lib.collection[key]` so we tolerate any value-string drift between releases. Existing `apple-store-client.test.ts` assertion updated to match the value-passing semantics.
+- **`releaseDate` Zod validation rejected real Apple chart data, silently killing every snapshot write.** Apple's chart `list()` returns timestamps with timezone offsets (`"2023-05-18T00:00:00-07:00"`), but `RawAppDataSchema` used `z.string().datetime()` which rejects offsets. M5's `writeSnapshot` re-parsed each payload through `SnapshotPayloadSchema` (which references `RawAppDataSchema`), so every real chart entry threw — Track B accumulated zero rows in production. Switched both `releaseDate` and `lastUpdated` to `z.string().datetime({ offset: true })`. New `tests/scrapers/raw-app-data-schema.test.ts` pins both formats.
+
+### Notes
+
+- 320 tests pass (was 314); 6 new regression tests added across the three fixes.
+- Pre-existing limitations not addressed in this PATCH: chart entries lack `ratingsCount` / `description`, so heuristic scorers compute composite 0/10 for every real-world candidate. M7 scope (separate `scrapeApps` enrichment pass). Apple App Store links use bundle ID instead of numeric `trackId` — also M7 polish.
+
 ## [0.5.0] - 2026-04-29
 
 M6 — orchestrator + reporting. `selection-agent scan` now produces the live ranked output the founder consumes; `selection-agent report --compare-judges` surfaces text vs. vision divergence across persisted judge runs.
@@ -216,6 +231,7 @@ M4 — LLM judges + lang quality eval. Selection Agent can now grade the localiz
   `permissions` + pinned `bun-version: 1.3.x`, `.env.example` documenting
   `ANTHROPIC_API_KEY` and model overrides.
 
+[0.5.1]: https://github.com/apps-machine/selection-agent/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/apps-machine/selection-agent/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/apps-machine/selection-agent/compare/v0.3.0...v0.4.0
 [0.1.0]: https://github.com/apps-machine/selection-agent/compare/v0.0.1...v0.1.0

@@ -122,10 +122,11 @@ const main = defineCommand({
           description: "Output format: markdown | json",
           default: "markdown",
         },
-        "no-llm": {
+        llm: {
           type: "boolean",
-          description: "Run heuristics only, skip LLM judges",
-          default: false,
+          description:
+            "Run LLM judges (default: true). Pass --no-llm to skip judges and run heuristics only.",
+          default: true,
         },
         db: {
           type: "string",
@@ -182,7 +183,7 @@ const main = defineCommand({
           );
           process.exit(2);
         }
-        const noLlm = args["no-llm"] === true;
+        const noLlm = args.llm === false;
         const dbPath =
           (typeof args.db === "string" && args.db) ||
           process.env.SELECTION_AGENT_DB ||

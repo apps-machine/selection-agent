@@ -21,8 +21,12 @@ export const RawAppDataSchema = z.object({
   description: z.string(),
   screenshotUrls: z.array(z.string().url()).default([]),
   iconUrl: z.string().url().nullable(),
-  releaseDate: z.string().datetime().nullable(),
-  lastUpdated: z.string().datetime().nullable(),
+  // Apple chart list() returns timestamps with timezone offsets
+  // ("2023-05-18T00:00:00-07:00"); the per-app endpoint returns Z-form
+  // ("2023-05-18T07:00:00Z"). Both are valid ISO 8601 — accept either so a
+  // real chart scrape doesn't silently kill snapshot writes downstream.
+  releaseDate: z.string().datetime({ offset: true }).nullable(),
+  lastUpdated: z.string().datetime({ offset: true }).nullable(),
   scrapedAt: z.string().datetime(),
 });
 

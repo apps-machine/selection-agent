@@ -43,9 +43,17 @@ export function createAppleScraperLib(lib: AppleScraperLib): ScraperLib {
       if (query.store !== "apple") {
         throw new Error(`apple client received non-apple query: ${query.store}`);
       }
-      const collection = APPLE_COLLECTION_MAP[query.collection];
-      if (!collection) {
+      const collectionKey = APPLE_COLLECTION_MAP[query.collection];
+      if (!collectionKey) {
         throw new Error(`unsupported apple collection: ${query.collection}`);
+      }
+      // `app-store-scraper` validates `list({collection})` against its own
+      // enum *values* (e.g. "topgrossingapplications"), not the key strings
+      // ("TOP_GROSSING_IOS"). Look up the value on the lib's own collection
+      // map so we tolerate any value-string drift between releases.
+      const collection = lib.collection[collectionKey];
+      if (!collection) {
+        throw new Error(`apple-store-scraper has no collection enum value for "${collectionKey}"`);
       }
       const raw = await lib.list({
         collection,
