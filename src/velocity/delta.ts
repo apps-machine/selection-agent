@@ -1,6 +1,12 @@
-// delta — Selection Agent
-// Implementation lands in milestone M5. See:
-//   https://github.com/apps-machine/selection-agent#milestones
-//   .context/eng-review-test-plan.md (in studio-core repo)
+import type { Cache } from "../storage/cache.ts";
+import type { VelocityScoreInput } from "./types.ts";
 
-export {};
+export type { VelocityScoreInput } from "./types.ts";
+
+export interface GetVelocityScoreArgs extends VelocityScoreInput {
+  cache: Cache;
+}
+
+export function getVelocityScore(_args: GetVelocityScoreArgs): number | null {
+  return null;
+}

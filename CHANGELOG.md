@@ -5,6 +5,22 @@ All notable changes to `@apps-machine/selection-agent` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+M5 ↔ M6 interface freeze. Locks the contract between velocity scaffolding (M5) and orchestrator + reporting (M6) so both can be built in parallel worktrees without signature drift.
+
+### Added
+
+- **`src/velocity/types.ts`** — `SnapshotPayloadSchema` (Zod) and `VelocityScoreInput`. The payload shape M5 will write into the pre-existing `app_snapshot` table (`raw: RawAppData`, `rankOfDay: int | null`). Single boundary; M5 can evolve the payload behind one Zod parse without DB migrations.
+- **`src/velocity/snapshot.ts`** — `writeSnapshot({ apps, cache, snapshotDay?, rankByKey? })` signature returning `{ written, skipped, day }`. Stub throws `M5 not implemented`. Idempotent semantics guaranteed by `app_snapshot` UNIQUE constraint when M5 fills it in.
+- **`src/velocity/delta.ts`** — `getVelocityScore({ store, appId, market, cache, asOf?, baselineDays? })` signature returning `number | null`. Stub returns `null`, which is semantically valid (means "not enough baseline yet") and lets M6 develop against `WEIGHTS_NO_VELOCITY` path without M5 being done.
+
+### Notes
+
+- No version bump. Freeze stubs are not new public-API exports (no barrel; `bin` still points at `cli/index.ts` only). M5 lands the real impl as `0.4.0` (MINOR), M6 lands as `0.5.0` (MINOR).
+- No schema migration. `app_snapshot` table already exists from M2 era; M5 just standardises the `payload` JSON shape via `SnapshotPayloadSchema`.
+- Contract details and merge strategy live at `.context/m5-m6-contract.md` (gitignored workspace scratchpad — see that file for the full M5/M6 ownership matrix, conflict points, and edge-case handling).
+
 ## [0.3.0] - 2026-04-29
 
 M4 — LLM judges + lang quality eval. Selection Agent can now grade the localization gap and cultural fit of a candidate app via Claude, and self-eval its own translation quality before recommending a market.
