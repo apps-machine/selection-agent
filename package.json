@@ -19,7 +19,8 @@
     "report": "bun src/cli/index.ts report",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
-    "evals": "bun test evals",
+    "evals": "bun test ./evals/text-judge.eval.ts ./evals/lang-quality.eval.ts ./evals/vision-judge.eval.ts",
+    "evals:write-baseline": "WRITE_BASELINE=1 bun run evals",
     "prepare": "[ -d .git ] && git config core.hooksPath .githooks 2>/dev/null || true"
   },
   "keywords": [

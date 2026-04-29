@@ -60,8 +60,11 @@ describe.skipIf(!SHOULD_RUN)("lang-quality eval (live LLM, EVALS=1)", () => {
         phrases: corpus.phrases,
         client,
       });
-      expect(result.ok).toBe(true);
-      if (!result.ok) throw new Error("unreachable");
+      if (!result.ok) {
+        throw new Error(
+          `evaluateLanguageQuality failed for ${t.language}/${t.market}: ${result.error.message}`,
+        );
+      }
 
       if (t.isBaseline) {
         expect(result.value.semanticEquivalenceScore).toBeGreaterThanOrEqual(9.0);

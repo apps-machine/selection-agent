@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "caseId": "cal-ai-br",
+      "locGapScore": 1,
+      "confidence": 0.88,
+      "modelVersion": "claude-sonnet-4-6",
+      "recordedAt": "2026-04-29T16:02:24.382Z"
+    },
+    {
+      "caseId": "picturethis-jp",
+      "locGapScore": 1,
+      "confidence": 0.91,
+      "modelVersion": "claude-sonnet-4-6",
+      "recordedAt": "2026-04-29T16:02:29.296Z"
+    },
+    {
+      "caseId": "remini-de",
+      "locGapScore": 1,
+      "confidence": 0.82,
+      "modelVersion": "claude-sonnet-4-6",
+      "recordedAt": "2026-04-29T16:02:33.587Z"
+    },
+    {
+      "caseId": "indie-utility-en-only-fr",
+      "locGapScore": 8.5,
+      "confidence": 0.82,
+      "modelVersion": "claude-sonnet-4-6",
+      "recordedAt": "2026-04-29T16:02:37.243Z"
+    },
+    {
+      "caseId": "machine-translated-paywall-br",
+      "locGapScore": 6,
+      "confidence": 0.78,
+      "modelVersion": "claude-sonnet-4-6",
+      "recordedAt": "2026-04-29T16:02:42.434Z"
+    },
+    {
+      "caseId": "no-pt-localization-high-revenue",
+      "locGapScore": 8,
+      "confidence": 0.82,
+      "modelVersion": "claude-sonnet-4-6",
+      "recordedAt": "2026-04-29T16:02:46.414Z"
+    },
+    {
+      "caseId": "dying-category-low-priority",
+      "locGapScore": 1,
+      "confidence": 0.9,
+      "modelVersion": "claude-sonnet-4-6",
+      "recordedAt": "2026-04-29T16:02:59.263Z"
+    },
+    {
+      "caseId": "growing-category-weak-incumbent-de",
+      "locGapScore": 8.5,
+      "confidence": 0.82,
+      "modelVersion": "claude-sonnet-4-6",
+      "recordedAt": "2026-04-29T16:03:03.851Z"
+    }
+  ]
+}

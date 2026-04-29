@@ -4,12 +4,19 @@ Live-LLM eval suites for M4 judges. Skipped by default; activated via env vars.
 
 ## Activation
 
+The eval files use the `.eval.ts` suffix — bun's default `bun test` does NOT
+auto-discover them, by design (so CI doesn't quietly burn API credits). Run
+them explicitly via the npm scripts, or pass paths with `./` prefix:
+
 ```bash
-# Run text-judge + lang-quality evals (vision is wired but todo'd until screenshots are dropped in)
-EVALS=1 ANTHROPIC_API_KEY=sk-ant-… bun test evals/
+# Run text-judge + lang-quality evals (vision is todo'd until screenshots are dropped in)
+EVALS=1 ANTHROPIC_API_KEY=sk-ant-... bun run evals
 
 # Seed/refresh baselines after a deliberate prompt or model change
-EVALS=1 WRITE_BASELINE=1 ANTHROPIC_API_KEY=sk-ant-… bun test evals/
+EVALS=1 ANTHROPIC_API_KEY=sk-ant-... bun run evals:write-baseline
+
+# Or pass explicit paths if you want to run a single suite:
+EVALS=1 ANTHROPIC_API_KEY=sk-ant-... bun test ./evals/text-judge.eval.ts
 ```
 
 ## Files
@@ -32,6 +39,22 @@ EVALS=1 WRITE_BASELINE=1 ANTHROPIC_API_KEY=sk-ant-… bun test evals/
 1. Inspect the case + the diff vs. the baseline blob.
 2. If the regression is intentional (prompt change, model upgrade), re-run with `WRITE_BASELINE=1`.
 3. If unintentional, revert the change that caused it.
+
+## Known limits (seeded 2026-04-29 baselines)
+
+**text-judge**: 8 of 10 cases seeded. Two cases dropped — `localized-but-no-pix-br`
+and `cultural-mismatch-jp` — because text-judge alone cannot reliably detect
+PIX-integration absence or food-imagery cultural mismatch. Those signals belong
+to vision-judge (for imagery) and to a future ASO-payment scraper (for PIX).
+TODO(M5): either move those cases to vision-judge.eval.ts or relax the
+fixture's `expectedSignals` for text-only judging.
+
+**lang-quality**: 1 of 6 markets seeded (`en/us` baseline only). The other 5
+target languages (ja, de, fr, pt-BR, es) errored before the baseline write,
+most likely from `max_tokens: 4096` overflowing on the forward-translation
+step when target-language tokens are wider than English (Japanese kanji,
+German compound nouns). TODO(M5): bump `max_tokens` per call, or split the
+50-phrase batch into chunks of ~25.
 
 ## Cost expectations (Sonnet 4.6, 2026 pricing)
 

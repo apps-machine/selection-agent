@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "language": "en",
+      "market": "us",
+      "semanticEquivalenceScore": 10,
+      "passes": true,
+      "modelVersion": "claude-sonnet-4-6",
+      "recordedAt": "2026-04-29T16:03:21.145Z"
+    }
+  ]
+}

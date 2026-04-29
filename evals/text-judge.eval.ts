@@ -49,8 +49,11 @@ describe.skipIf(!SHOULD_RUN)("text-judge eval (live LLM, EVALS=1)", () => {
     test(c.label, async () => {
       const app = RawAppDataSchema.parse(c.app);
       const result = await judgeAppText({ app, client });
-      expect(result.ok).toBe(true);
-      if (!result.ok) throw new Error("unreachable");
+      if (!result.ok) {
+        throw new Error(
+          `judgeAppText failed for ${c.id}: ${result.error.message}`,
+        );
+      }
       const r = result.value;
       const min = "expectedLocGapMin" in c ? (c as { expectedLocGapMin: number }).expectedLocGapMin : 0;
       const max = "expectedLocGapMax" in c ? (c as { expectedLocGapMax: number }).expectedLocGapMax : 10;
