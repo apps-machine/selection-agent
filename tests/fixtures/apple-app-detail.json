@@ -1,0 +1,18 @@
+{
+  "id": 1604029305,
+  "appId": "com.calai.calai",
+  "title": "Cal AI: Calorie Tracker",
+  "developer": "Cal AI Inc.",
+  "primaryGenre": "Health & Fitness",
+  "price": 0,
+  "currency": "USD",
+  "free": true,
+  "score": 4.7,
+  "ratings": 89432,
+  "icon": "https://example.com/calai-icon.png",
+  "description": "Track your calories with AI-powered photo recognition.",
+  "screenshots": ["https://example.com/calai-1.png"],
+  "released": "2023-01-01T00:00:00Z",
+  "updated": "2026-04-01T00:00:00Z",
+  "inAppPurchases": true
+}
