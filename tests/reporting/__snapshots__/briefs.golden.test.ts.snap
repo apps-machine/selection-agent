@@ -1,0 +1,30 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`generateBrief() — golden renders the canonical fixture into the pinned markdown 1`] = `
+"# Selection Agent — Scan 2026-04-29
+
+**Markets**: us, jp, de, fr, br, es  |  **Apps scanned**: 280  |  **Cost**: $1.23
+
+## Top 2 candidates
+
+### #1 — Cal AI: Calorie Tracker (apple, br) — composite 8.20/10
+
+- **Localization gap**: 9.0/10 (English-only listing on a Brazilian top chart, no PIX.)
+- **Cultural fit (vision)**: 7.0/10 (US-style food imagery, English captions on every screenshot.)
+- **Revenue est**: 8.5/10 (89432 ratings, market br)
+- **Paywall complexity**: 6.5/10
+- **Velocity**: scaffolding (J0/14)
+- **Confidence**: 0.80
+- App Store: https://apps.apple.com/br/app/idcom.example.calai
+
+### #2 — Remini (google, jp) — composite 6.40/10
+
+- **Localization gap**: 5.5/10 (Partial JP localization but paywall stays English.)
+- **Cultural fit (vision)**: n/a (no vision judge — empty screenshots)
+- **Revenue est**: 7.0/10 (230000 ratings, market jp)
+- **Paywall complexity**: 6.5/10
+- **Velocity**: 6.0/10
+- **Confidence**: 0.70
+- App Store: https://play.google.com/store/apps/details?id=com.example.remini&gl=jp
+"
+`;

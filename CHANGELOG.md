@@ -5,6 +5,40 @@ All notable changes to `@apps-machine/selection-agent` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-04-29
+
+M6 — orchestrator + reporting. `selection-agent scan` now produces the live ranked output the founder consumes; `selection-agent report --compare-judges` surfaces text vs. vision divergence across persisted judge runs.
+
+### Added
+
+- **`src/orchestrator/pipeline.ts`** — `runScan({ cache, scrapers, textClient, visionClient, fetchImage, ... })`. Composes scrape → snapshot → judge → score → rank in one call. The chart-scraper layer's `mapWithConcurrency` keeps one blocked `(store × market)` slice from killing the run; failed slices land in `result.failedSlices`. The M5 `writeSnapshot` side-effect runs before judges, so Track B keeps accumulating during an LLM outage. Each judge call is double-written: cached via the M4 content-addressed `withJudgeCache` (cache hit/miss path) and persisted to the new `judge_result` table (queryable per run).
+- **`src/orchestrator/types.ts`** — `ScanInput`, `ScanResult`, `ScoredCandidate`, `RankedCandidate`, `FailedSlice`. Pipeline boundary types kept separate from the orchestrator implementation so reporting modules can import without pulling in the whole pipeline graph.
+- **`src/reporting/ranker.ts`** — `rank(candidates, topN)`. Deterministic 4-level sort: composite desc → mean(judge confidence) desc → ratingsCount desc → `(store|appId|market)` ascending. Same input always produces the same order; missing judges count as confidence 0 so fully-judged candidates beat partially-judged ones at the same composite.
+- **`src/reporting/briefs.ts`** — `generateBrief(scanResult)`. Markdown founder brief with per-app sections (loc gap, cultural fit, revenue, paywall, velocity, confidence, store link) plus a "failed slices" footer. Pinned via golden snapshot.
+- **`src/reporting/compare-judges.ts`** — `compareJudges(judgeResults)` and `renderJudgeDivergenceMarkdown(report)`. Pairs text + vision results for the same `(store, appId, market)`, sorts by `|locGapScore − culturalFitScore|` desc, and renders a side-by-side reasoning table.
+- **`src/storage/judge-result-store.ts`** — `JudgeResultStore` (insert + `selectByRunId` + `latestRunId`). Mirrors the M5 `SnapshotStore` pattern (single SQLite connection via `Cache`, payload validated through `JudgeResultSchema` on read so a corrupt row never crashes a report).
+- **`src/storage/schema.ts`** — `JUDGE_RESULT_SCHEMA` table with `UNIQUE(run_id, store, app_id, market, kind)` and indexes on `run_id` and `(store, app_id, market, kind)`.
+- **CLI `selection-agent scan`** — replaces the M6-stub `NOT_IMPLEMENTED` error. Flags: `--top` (default 30), `--markets` (default 6 Phase 0 markets), `--stores` (default `apple,google`), `--format` (`markdown` | `json`), `--no-llm` (heuristics only), `--db`, `--budget`. Pre-flight checks `ANTHROPIC_API_KEY` unless `--no-llm`; pre-flight validates `--top`, `--format`, `--budget`, `--stores` shape.
+- **CLI `selection-agent report --compare-judges`** — replaces the stub. Flags: `--run-id` (default: most recent), `--db`. Loads judge rows from `judge_result`, renders the divergence markdown.
+
+### Tests
+
+- **`tests/orchestrator/`** — 7 pipeline tests across 6 files: happy path, Apple-blocked + all-blocked, no-llm, budget-breach (cap forces fail-fast on third judge call), snapshot-on-judge-fail (Track B keeps accumulating), velocity-with-baseline (`seedSnapshotHistory` from M5 → composite uses `WEIGHTS_WITH_VELOCITY`).
+- **`tests/reporting/ranker.test.ts`** — every tie-break level pinned; idempotent on shuffled input.
+- **`tests/reporting/briefs.golden.test.ts`** — golden snapshot of the canonical fixture; structural assertions for required headers + per-app fields; empty-candidates fallback.
+- **`tests/reporting/compare-judges.test.ts`** — pairing logic, divergence ordering, unpaired-result accounting, empty-input handling, markdown shape.
+- **`tests/storage/judge-result.test.ts`** — insert, UNIQUE conflict, `selectByRunId`, `latestRunId`, corrupt-payload-skip.
+
+### Changed
+
+- `src/storage/cache.ts` — `Cache` exposes `judgeResultStore()` (mirrors `snapshotStore()`) and a `rawDb()` test escape hatch. `JUDGE_RESULT_SCHEMA` is appended to `ALL_SCHEMAS` so the table auto-creates on `Cache.open`.
+- `knip.json` — removed `src/reporting/**` and `src/orchestrator/**` from the selection-agent ignore list now that they have real implementations + tests.
+
+### Notes
+
+- Judge cache (content-addressed) and `judge_result` table (run-scoped) coexist intentionally. The cache answers "have we computed this exact prompt before"; the table answers "what did judges produce in run X". Two writes per judge call is cheap and avoids forcing every report query through a join on content digest. Cross-store dedup is a feature: scraping the same app on apple+google produces one judge call (same content), which is correct — a candidate's `judge_result` row count = unique `(appId, market) × kinds` per run, not `candidates × kinds`.
+- Pipeline does not run a separate `scrapeApps` enrichment pass — chart entries already produce `RawAppData` via `mapToRawAppData()`. M7+ will add a per-app detail enrichment hop when richer descriptions are needed.
+
 ## [0.4.0] - 2026-04-29
 
 M5 — velocity scaffolding. Track B (first-mover detection) starts accumulating snapshots immediately and produces a usable score from J14 onward. Until then, `getVelocityScore` returns `null` and the composite scorer flips to `WEIGHTS_NO_VELOCITY` (already wired since M3).
@@ -182,6 +216,7 @@ M4 — LLM judges + lang quality eval. Selection Agent can now grade the localiz
   `permissions` + pinned `bun-version: 1.3.x`, `.env.example` documenting
   `ANTHROPIC_API_KEY` and model overrides.
 
+[0.5.0]: https://github.com/apps-machine/selection-agent/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/apps-machine/selection-agent/compare/v0.3.0...v0.4.0
 [0.1.0]: https://github.com/apps-machine/selection-agent/compare/v0.0.1...v0.1.0
 [0.0.1]: https://github.com/apps-machine/selection-agent/releases/tag/v0.0.1

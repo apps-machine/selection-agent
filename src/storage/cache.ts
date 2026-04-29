@@ -3,6 +3,7 @@ import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import type { ZodType } from "zod";
 import { assertDiskSpace, MIN_DISK_BYTES_DEFAULT } from "./disk.ts";
+import { JudgeResultStore } from "./judge-result-store.ts";
 import { SnapshotStore } from "./queries.ts";
 import { ALL_SCHEMAS } from "./schema.ts";
 
@@ -178,5 +179,22 @@ export class Cache {
    */
   snapshotStore(): SnapshotStore {
     return new SnapshotStore(this.db);
+  }
+
+  /**
+   * Returns a `JudgeResultStore` bound to this Cache's underlying SQLite
+   * connection. Mirrors `snapshotStore()` — single connection, single WAL.
+   */
+  judgeResultStore(): JudgeResultStore {
+    return new JudgeResultStore(this.db);
+  }
+
+  /**
+   * Escape hatch for tests that need raw SQL access (e.g., to corrupt a
+   * row and assert defensive read-side behaviour). Production code
+   * should never use this.
+   */
+  rawDb(): Database {
+    return this.db;
   }
 }
