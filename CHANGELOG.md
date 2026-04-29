@@ -5,6 +5,47 @@ All notable changes to `@apps-machine/selection-agent` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-04-29
+
+### Added
+- **Heuristic scoring suite (M3)** — Track A scorers that map raw app data
+  to opportunity signals on a 0-10 scale.
+  - `scoreRevenue` — log-scaled signal from rating x ratingsCount x ARPU.
+    Per-market ARPU lives in a swappable `arpu-by-market.ts` config so the
+    founder can validate or drop regional weighting without touching the scorer.
+  - `scorePaywallComplexity` — text-mining the description for subscription /
+    trial / lifetime / multi-tier signals. Higher complexity = stronger
+    opportunity signal (incumbent invested in monetization, harder to clone).
+  - `scoreLocalizationGap` — detects description language via script regex
+    plus Latin-script stop-word counting (covers Polish, Czech, Romanian,
+    Hungarian, Turkish via Unicode property tokenization), compares to expected
+    market language. Multi-language markets (CH, BE, LU, IN, SG, HK) return
+    neutral instead of false-positive gap signals.
+  - `scoreComposite` — weighted combine. Weights are 0.4 / 0.4 / 0.2
+    (loc-gap / revenue / paywall) when velocity is null. When M5 lands
+    velocity, weights shift to 0.3 / 0.3 / 0.15 / 0.25.
+- **Token-bucket rate limiter** (`util/rate-limit.ts`) — per-host bucket
+  shared across chart + app + review scrapers. Closes the M2 gap where
+  charts(c=6) + apps(c=8) = 14 concurrent calls to the same host risked
+  Akamai/Google rate-limit trips. Default off; pipeline (M6) will instantiate
+  one limiter and pass it to all scrapers.
+- **Playwright Apple fallback** (`scrapers/playwright-fallback.ts`) —
+  drives headless Chromium against `apps.apple.com` when the primary
+  `app-store-scraper` lib trips Akamai bot detection. Lazy-loaded
+  (`playwright` is only imported when invoked) so installs that never use
+  it skip the chromium download. Iterates every JSON-LD block on the page
+  to find `MobileApplication` (Apple emits multiple). Slug regex `[^/]+`
+  handles accented and non-Latin app slugs. Clear install hint when chromium
+  binary is missing.
+
+### Fixed
+- Revenue scorer now guards against `NaN` and `Infinity` rating /
+  ratingsCount inputs so a single corrupt scrape cannot poison the entire
+  ranking pipeline.
+- Localization-gap detection requires a strict best-vs-runner-up margin to
+  claim a language; tied counts return null instead of biasing toward
+  whichever language enumerated first.
+
 ## [0.1.0] - 2026-04-29
 
 ### Added
