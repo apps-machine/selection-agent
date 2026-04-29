@@ -5,6 +5,27 @@ All notable changes to `@apps-machine/selection-agent` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2026-04-29
+
+### Changed
+- **Recalibrated per-market revenue weights** based on adversarial review by an
+  independent model (Codex GPT-5) with sourced 2025 data. The previous table was
+  blended across categories (games + utility + sub apps) which over-promoted
+  Brazil and India and under-valued Japan and the US for the subscription-clone
+  niche. New ratios:
+  - US/BR: 7.8x → **22x** (Brazil over-promoted by ~3x previously)
+  - US/IN: 11.7x → **69x** (India over-promoted by ~6x previously)
+  - JP: 3.2 → 3.5 (was undervalued; could be higher for games but kept conservative for sub apps)
+  - US: 3.5 → 5.5 (was undervalued vs Appfigures 2025 ~$5.55/install)
+- **Renamed** `ARPU_BY_MARKET` to `MARKET_REVENUE_WEIGHT`, `arpuForMarket()` to
+  `marketRevenueWeight()`, and the file `arpu-by-market.ts` to
+  `market-revenue-weight.ts`. The values are not strictly ARPU — they are
+  category-weighted multipliers for a subscription/utility-clone preset.
+- Documented sources inline (Sensor Tower 2023-2024, Business of Apps 2023-2025,
+  Appfigures 2025, RevenueCat 2025 State of Subscription Apps, Apple MSCA Japan
+  changes Dec 2025) and flagged Phase 1 TODO to split into category presets
+  (subscription / games / ads).
+
 ## [0.2.0] - 2026-04-29
 
 ### Added

@@ -1,4 +1,4 @@
-import { arpuForMarket } from "./arpu-by-market.ts";
+import { marketRevenueWeight } from "./market-revenue-weight.ts";
 
 export interface RevenueScoreInput {
   rating: number | null;
@@ -27,7 +27,7 @@ export function scoreRevenue(input: RevenueScoreInput): number {
   if (!Number.isFinite(rating) || !Number.isFinite(ratingsCount)) return 0;
   if (ratingsCount <= 0) return 0;
 
-  const signal = rating * ratingsCount * arpuForMarket(market);
+  const signal = rating * ratingsCount * marketRevenueWeight(market);
   if (!Number.isFinite(signal) || signal <= 0) return 0;
 
   const logSignal = Math.log10(signal + 1);
