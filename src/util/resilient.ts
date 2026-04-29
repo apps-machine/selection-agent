@@ -1,10 +1,11 @@
-import { isFatalHttpError, isTransientHttpError, retryWithBackoff, type RetryOptions } from "./retry.ts";
+import {
+  isFatalHttpError,
+  isTransientHttpError,
+  type RetryOptions,
+  retryWithBackoff,
+} from "./retry.ts";
 
-export type ResilientSource =
-  | "primary"
-  | "fallback"
-  | "cache-fresh"
-  | "cache-stale";
+export type ResilientSource = "primary" | "fallback" | "cache-fresh" | "cache-stale";
 
 export interface ResilientResult<T> {
   value: T;
@@ -30,11 +31,7 @@ export interface ResilientTiers<T> {
 
 export interface ResilientOptions {
   retry?: RetryOptions;
-  logger?: (
-    level: "info" | "warn" | "error",
-    msg: string,
-    ctx?: Record<string, unknown>,
-  ) => void;
+  logger?: (level: "info" | "warn" | "error", msg: string, ctx?: Record<string, unknown>) => void;
   clock?: () => number;
   /**
    * Maximum age (ms) of a stale cache entry that is still considered acceptable

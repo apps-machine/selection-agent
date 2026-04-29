@@ -1,14 +1,7 @@
 import { describe, expect, test } from "bun:test";
+import { JUDGE_CACHE_TTL_SECONDS, judgeCacheKey, withJudgeCache } from "../../src/judges/cache.ts";
+import { type TextJudgeResult, TextJudgeResultSchema } from "../../src/judges/schemas.ts";
 import { Cache } from "../../src/storage/cache.ts";
-import {
-  JUDGE_CACHE_TTL_SECONDS,
-  judgeCacheKey,
-  withJudgeCache,
-} from "../../src/judges/cache.ts";
-import {
-  TextJudgeResultSchema,
-  type TextJudgeResult,
-} from "../../src/judges/schemas.ts";
 
 const sampleResult: TextJudgeResult = {
   kind: "text",

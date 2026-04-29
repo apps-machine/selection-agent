@@ -11,9 +11,7 @@ export const MODEL_PRICING_USD_PER_MTOK: Readonly<Record<string, ModelPricing>> 
   "claude-haiku-4-5-20251001": { inputPerMTok: 0.8, outputPerMTok: 4 },
 };
 
-const FALLBACK_PRICING: ModelPricing = MODEL_PRICING_USD_PER_MTOK[
-  "claude-sonnet-4-6"
-]!;
+const FALLBACK_PRICING: ModelPricing = MODEL_PRICING_USD_PER_MTOK["claude-sonnet-4-6"]!;
 
 export interface CallUsage {
   model: string;
@@ -23,10 +21,7 @@ export interface CallUsage {
 
 export function estimateCallCostUsd(usage: CallUsage): number {
   const p = MODEL_PRICING_USD_PER_MTOK[usage.model] ?? FALLBACK_PRICING;
-  return (
-    (usage.input * p.inputPerMTok) / 1_000_000 +
-    (usage.output * p.outputPerMTok) / 1_000_000
-  );
+  return (usage.input * p.inputPerMTok) / 1_000_000 + (usage.output * p.outputPerMTok) / 1_000_000;
 }
 
 export interface ModelBreakdown {

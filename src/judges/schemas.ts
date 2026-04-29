@@ -6,10 +6,7 @@ export type JudgeKind = z.infer<typeof JudgeKindSchema>;
 
 const Score10 = z.number().min(0).max(10);
 const Confidence = z.number().min(0).max(1);
-const MarketCode = z
-  .string()
-  .length(2)
-  .describe("ISO 3166-1 alpha-2 country code, lowercase");
+const MarketCode = z.string().length(2).describe("ISO 3166-1 alpha-2 country code, lowercase");
 // Reasoning is free-form model output rendered downstream in reports/dashboards.
 // Capping at 600 chars contains prompt-injection-style payloads from app
 // descriptions that try to seed authoritative-sounding text for human readers.
@@ -88,11 +85,8 @@ export const LangQualityResultSchema = z
     perPhraseResults: z.array(LangPhraseEvalSchema),
     modelVersion: z.string().min(1),
   })
-  .refine(
-    (r) => r.passes === r.semanticEquivalenceScore >= LANG_QUALITY_PASS_THRESHOLD,
-    {
-      message: `passes must equal (semanticEquivalenceScore >= ${LANG_QUALITY_PASS_THRESHOLD})`,
-      path: ["passes"],
-    },
-  );
+  .refine((r) => r.passes === r.semanticEquivalenceScore >= LANG_QUALITY_PASS_THRESHOLD, {
+    message: `passes must equal (semanticEquivalenceScore >= ${LANG_QUALITY_PASS_THRESHOLD})`,
+    path: ["passes"],
+  });
 export type LangQualityResult = z.infer<typeof LangQualityResultSchema>;

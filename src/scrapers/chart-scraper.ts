@@ -1,8 +1,8 @@
-import { Cache } from "../storage/cache.ts";
+import type { Cache } from "../storage/cache.ts";
 import type { RawAppData, Store } from "../types/raw-app-data.ts";
 import { mapWithConcurrency } from "../util/concurrent.ts";
 import type { RateLimiter } from "../util/rate-limit.ts";
-import { resilient, type ResilientCache } from "../util/resilient.ts";
+import { type ResilientCache, resilient } from "../util/resilient.ts";
 import type { ChartEntry, Collection, ScraperLib } from "./api.ts";
 import { mapToRawAppData } from "./api.ts";
 
@@ -26,11 +26,7 @@ export interface ChartScrapeOptions {
    * host and trip Akamai/Google rate limits.
    */
   rateLimiter?: RateLimiter;
-  logger?: (
-    level: "info" | "warn" | "error",
-    msg: string,
-    ctx?: Record<string, unknown>,
-  ) => void;
+  logger?: (level: "info" | "warn" | "error", msg: string, ctx?: Record<string, unknown>) => void;
   scrapedAt?: () => string;
 }
 
@@ -49,20 +45,10 @@ export interface ChartScrapeReport {
 import { buildCacheKey } from "../storage/cache-key.ts";
 
 function chartCacheKey(job: ChartScrapeJob): string {
-  return buildCacheKey(
-    "chart",
-    job.store,
-    job.market.toLowerCase(),
-    job.collection,
-    job.limit,
-  );
+  return buildCacheKey("chart", job.store, job.market.toLowerCase(), job.collection, job.limit);
 }
 
-function cacheAdapter(
-  cache: Cache,
-  key: string,
-  ttlSeconds: number,
-): ResilientCache<ChartEntry[]> {
+function cacheAdapter(cache: Cache, key: string, ttlSeconds: number): ResilientCache<ChartEntry[]> {
   return {
     get: () => cache.get<ChartEntry[]>(key),
     getStale: () => {

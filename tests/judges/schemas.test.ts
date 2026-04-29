@@ -43,33 +43,23 @@ describe("TextJudgeResultSchema", () => {
   });
 
   test("rejects locGapScore > 10", () => {
-    expect(() =>
-      TextJudgeResultSchema.parse({ ...validText, locGapScore: 11 }),
-    ).toThrow();
+    expect(() => TextJudgeResultSchema.parse({ ...validText, locGapScore: 11 })).toThrow();
   });
 
   test("rejects locGapScore < 0", () => {
-    expect(() =>
-      TextJudgeResultSchema.parse({ ...validText, locGapScore: -1 }),
-    ).toThrow();
+    expect(() => TextJudgeResultSchema.parse({ ...validText, locGapScore: -1 })).toThrow();
   });
 
   test("rejects confidence > 1", () => {
-    expect(() =>
-      TextJudgeResultSchema.parse({ ...validText, confidence: 1.5 }),
-    ).toThrow();
+    expect(() => TextJudgeResultSchema.parse({ ...validText, confidence: 1.5 })).toThrow();
   });
 
   test("rejects market with wrong length (not ISO alpha-2)", () => {
-    expect(() =>
-      TextJudgeResultSchema.parse({ ...validText, market: "BRA" }),
-    ).toThrow();
+    expect(() => TextJudgeResultSchema.parse({ ...validText, market: "BRA" })).toThrow();
   });
 
   test("rejects empty reasoning", () => {
-    expect(() =>
-      TextJudgeResultSchema.parse({ ...validText, reasoning: "" }),
-    ).toThrow();
+    expect(() => TextJudgeResultSchema.parse({ ...validText, reasoning: "" })).toThrow();
   });
 
   test("rejects reasoning longer than 600 chars (prompt-injection cap)", () => {
@@ -79,9 +69,7 @@ describe("TextJudgeResultSchema", () => {
   });
 
   test("rejects wrong kind discriminant", () => {
-    expect(() =>
-      TextJudgeResultSchema.parse({ ...validText, kind: "vision" }),
-    ).toThrow();
+    expect(() => TextJudgeResultSchema.parse({ ...validText, kind: "vision" })).toThrow();
   });
 });
 
@@ -127,9 +115,7 @@ describe("VisionJudgeResultSchema", () => {
   });
 
   test("rejects culturalFitScore > 10", () => {
-    expect(() =>
-      VisionJudgeResultSchema.parse({ ...validVision, culturalFitScore: 12 }),
-    ).toThrow();
+    expect(() => VisionJudgeResultSchema.parse({ ...validVision, culturalFitScore: 12 })).toThrow();
   });
 });
 
@@ -203,13 +189,7 @@ describe("LangQualityResultSchema", () => {
   });
 
   test("language can be ISO 639-1 ('en') or BCP-47 ('pt-BR')", () => {
-    expect(
-      LangQualityResultSchema.parse({ ...validLang, language: "en" })
-        .language,
-    ).toBe("en");
-    expect(
-      LangQualityResultSchema.parse({ ...validLang, language: "ja" })
-        .language,
-    ).toBe("ja");
+    expect(LangQualityResultSchema.parse({ ...validLang, language: "en" }).language).toBe("en");
+    expect(LangQualityResultSchema.parse({ ...validLang, language: "ja" }).language).toBe("ja");
   });
 });

@@ -115,10 +115,11 @@ describe("parseChartHtml", () => {
 describe("createPlaywrightAppleFallback", () => {
   test("returns a ScraperLib with fetchChart + fetchApp", () => {
     const lib = createPlaywrightAppleFallback({
-      launchBrowser: async () => ({
-        newContext: async () => ({ newPage: async () => null as never, close: async () => {} }),
-        close: async () => {},
-      } as never),
+      launchBrowser: async () =>
+        ({
+          newContext: async () => ({ newPage: async () => null as never, close: async () => {} }),
+          close: async () => {},
+        }) as never,
     });
     expect(typeof lib.fetchChart).toBe("function");
     expect(typeof lib.fetchApp).toBe("function");
@@ -133,12 +134,8 @@ describe("createPlaywrightAppleFallback", () => {
       collection: "top-grossing",
       limit: 100,
     });
-    expect(fake.page.visited[0]).toBe(
-      "https://apps.apple.com/us/charts/iphone/top-grossing-apps",
-    );
-    expect(entries.map((e) => e.appId).sort()).toEqual(
-      ["1252497129", "1352082603", "6480417616"],
-    );
+    expect(fake.page.visited[0]).toBe("https://apps.apple.com/us/charts/iphone/top-grossing-apps");
+    expect(entries.map((e) => e.appId).sort()).toEqual(["1252497129", "1352082603", "6480417616"]);
     expect(fake.page.closed).toBe(true);
     expect(fake.isCtxClosed()).toBe(true);
     expect(fake.isBrowserClosed()).toBe(true);
@@ -168,9 +165,9 @@ describe("createPlaywrightAppleFallback", () => {
   test("fetchApp throws clear error when JSON-LD missing", async () => {
     const fake = makeFakeBrowser("<html>nothing</html>");
     const lib = createPlaywrightAppleFallback({ launchBrowser: fake.launch });
-    await expect(
-      lib.fetchApp({ store: "apple", market: "us", appId: "999" }),
-    ).rejects.toThrow(/parse app page/i);
+    await expect(lib.fetchApp({ store: "apple", market: "us", appId: "999" })).rejects.toThrow(
+      /parse app page/i,
+    );
   });
 
   test("rejects non-apple queries", async () => {
@@ -189,9 +186,7 @@ describe("createPlaywrightAppleFallback", () => {
   test("closes browser even when fetchApp throws", async () => {
     const fake = makeFakeBrowser("<html>nothing</html>");
     const lib = createPlaywrightAppleFallback({ launchBrowser: fake.launch });
-    await expect(
-      lib.fetchApp({ store: "apple", market: "us", appId: "1" }),
-    ).rejects.toThrow();
+    await expect(lib.fetchApp({ store: "apple", market: "us", appId: "1" })).rejects.toThrow();
     expect(fake.isBrowserClosed()).toBe(true);
   });
 
@@ -256,7 +251,9 @@ describe("parseChartHtml — regression: accented slugs", () => {
 <a href="/jp/app/カロリー計算/id1234567890">JP App</a>
 <a href="/fr/app/déjà-vu/id9999999999">FR App</a>
 </body></html>`;
-    const ids = parseChartHtml(html).map((e) => e.appId).sort();
+    const ids = parseChartHtml(html)
+      .map((e) => e.appId)
+      .sort();
     expect(ids).toEqual(["1234567890", "1485284428", "9999999999"]);
   });
 });

@@ -1,9 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { type ReviewScraperLib, scrapeReviewPage } from "../../src/scrapers/review-scraper.ts";
 import { Cache } from "../../src/storage/cache.ts";
-import {
-  scrapeReviewPage,
-  type ReviewScraperLib,
-} from "../../src/scrapers/review-scraper.ts";
 
 describe("scrapeReviewPage", () => {
   let cache: Cache;

@@ -14,8 +14,23 @@ export interface LocalizationGapInput {
   market: string;
 }
 
-type LangCode = "en" | "fr" | "de" | "es" | "pt" | "it" | "nl" | "pl" | "tr"
-  | "ja" | "ko" | "zh" | "ru" | "el" | "ar" | "he";
+type LangCode =
+  | "en"
+  | "fr"
+  | "de"
+  | "es"
+  | "pt"
+  | "it"
+  | "nl"
+  | "pl"
+  | "tr"
+  | "ja"
+  | "ko"
+  | "zh"
+  | "ru"
+  | "el"
+  | "ar"
+  | "he";
 
 // Markets with a clear single dominant language for app store listings.
 // Multi-language markets (ch, be, lu, in, sg, hk) are intentionally omitted —
@@ -23,14 +38,29 @@ type LangCode = "en" | "fr" | "de" | "es" | "pt" | "it" | "nl" | "pl" | "tr"
 // signals.
 const MARKET_TO_LANG: Readonly<Record<string, LangCode>> = Object.freeze({
   // English
-  us: "en", gb: "en", au: "en", ca: "en", ie: "en", nz: "en", za: "en",
+  us: "en",
+  gb: "en",
+  au: "en",
+  ca: "en",
+  ie: "en",
+  nz: "en",
+  za: "en",
   // Romance
   fr: "fr",
-  es: "es", mx: "es", ar: "es", cl: "es", co: "es", pe: "es", uy: "es", ve: "es",
-  br: "pt", pt: "pt",
+  es: "es",
+  mx: "es",
+  ar: "es",
+  cl: "es",
+  co: "es",
+  pe: "es",
+  uy: "es",
+  ve: "es",
+  br: "pt",
+  pt: "pt",
   it: "it",
   // Germanic / other Western EU
-  de: "de", at: "de",
+  de: "de",
+  at: "de",
   nl: "nl",
   // Slavic
   pl: "pl",
@@ -38,21 +68,118 @@ const MARKET_TO_LANG: Readonly<Record<string, LangCode>> = Object.freeze({
   // Asian (script-detectable)
   jp: "ja",
   kr: "ko",
-  cn: "zh", tw: "zh",
+  cn: "zh",
+  tw: "zh",
   // Other
   tr: "tr",
   gr: "el",
-  sa: "ar", ae: "ar", eg: "ar",
+  sa: "ar",
+  ae: "ar",
+  eg: "ar",
   il: "he",
 });
 
 // Stop word sets — chosen to maximize disambiguation across Latin-script langs.
 const STOP_WORDS_RAW: Readonly<Record<string, readonly string[]>> = Object.freeze({
-  en: ["the", "and", "you", "your", "with", "this", "that", "for", "are", "is", "have", "of", "to", "a", "an", "or", "if", "can", "be", "by", "in", "on", "at", "we"],
-  fr: ["le", "la", "les", "et", "est", "vous", "pour", "avec", "votre", "des", "une", "dans", "ce", "sont", "ou", "du", "au"],
-  de: ["der", "die", "das", "und", "ist", "sie", "für", "mit", "ihre", "ein", "eine", "einem", "einer", "dem", "den", "zum", "zur", "deine", "deinen"],
-  es: ["el", "los", "las", "y", "es", "con", "su", "este", "esta", "una", "un", "tus", "sus", "que"],
-  pt: ["o", "os", "as", "é", "com", "sua", "seu", "uma", "um", "no", "na", "do", "da", "dos", "das"],
+  en: [
+    "the",
+    "and",
+    "you",
+    "your",
+    "with",
+    "this",
+    "that",
+    "for",
+    "are",
+    "is",
+    "have",
+    "of",
+    "to",
+    "a",
+    "an",
+    "or",
+    "if",
+    "can",
+    "be",
+    "by",
+    "in",
+    "on",
+    "at",
+    "we",
+  ],
+  fr: [
+    "le",
+    "la",
+    "les",
+    "et",
+    "est",
+    "vous",
+    "pour",
+    "avec",
+    "votre",
+    "des",
+    "une",
+    "dans",
+    "ce",
+    "sont",
+    "ou",
+    "du",
+    "au",
+  ],
+  de: [
+    "der",
+    "die",
+    "das",
+    "und",
+    "ist",
+    "sie",
+    "für",
+    "mit",
+    "ihre",
+    "ein",
+    "eine",
+    "einem",
+    "einer",
+    "dem",
+    "den",
+    "zum",
+    "zur",
+    "deine",
+    "deinen",
+  ],
+  es: [
+    "el",
+    "los",
+    "las",
+    "y",
+    "es",
+    "con",
+    "su",
+    "este",
+    "esta",
+    "una",
+    "un",
+    "tus",
+    "sus",
+    "que",
+  ],
+  pt: [
+    "o",
+    "os",
+    "as",
+    "é",
+    "com",
+    "sua",
+    "seu",
+    "uma",
+    "um",
+    "no",
+    "na",
+    "do",
+    "da",
+    "dos",
+    "das",
+  ],
   it: ["il", "lo", "gli", "è", "per", "tuo", "questa", "della", "delle", "degli", "che", "una"],
   nl: ["het", "een", "en", "voor", "met", "uw", "deze", "van", "te", "op", "niet", "naar", "is"],
   pl: ["i", "w", "z", "na", "do", "jest", "się", "od", "po", "dla", "to", "że", "są", "ale"],

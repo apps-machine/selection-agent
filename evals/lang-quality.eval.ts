@@ -1,19 +1,16 @@
 import { describe, expect, test } from "bun:test";
-import { writeFileSync, readFileSync, existsSync, mkdirSync } from "node:fs";
-import { join, dirname } from "node:path";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import Anthropic from "@anthropic-ai/sdk";
+import {
+  evaluateLanguageQuality,
+  type LangQualityClient,
+} from "../src/judges/lang-quality-eval.ts";
+import { LANG_QUALITY_PASS_THRESHOLD } from "../src/judges/schemas.ts";
 import corpus from "./fixtures/lang-corpus.json";
 import targets from "./fixtures/lang-targets.json";
-import {
-  type LangQualityClient,
-  evaluateLanguageQuality,
-} from "../src/judges/lang-quality-eval.ts";
-import {
-  LANG_QUALITY_PASS_THRESHOLD,
-} from "../src/judges/schemas.ts";
 
-const SHOULD_RUN =
-  process.env.EVALS === "1" && typeof process.env.ANTHROPIC_API_KEY === "string";
+const SHOULD_RUN = process.env.EVALS === "1" && typeof process.env.ANTHROPIC_API_KEY === "string";
 
 const BASELINE_PATH = join(
   dirname(new URL(import.meta.url).pathname),
@@ -41,10 +38,7 @@ function loadBaseline(): Record<string, BaselineEntry> {
 
 function saveBaseline(entries: BaselineEntry[]): void {
   mkdirSync(dirname(BASELINE_PATH), { recursive: true });
-  writeFileSync(
-    BASELINE_PATH,
-    JSON.stringify({ version: 1, entries }, null, 2) + "\n",
-  );
+  writeFileSync(BASELINE_PATH, `${JSON.stringify({ version: 1, entries }, null, 2)}\n`);
 }
 
 describe.skipIf(!SHOULD_RUN)("lang-quality eval (live LLM, EVALS=1)", () => {
@@ -77,8 +71,7 @@ describe.skipIf(!SHOULD_RUN)("lang-quality eval (live LLM, EVALS=1)", () => {
       const prev = baseline[key];
       if (prev) {
         const drift =
-          Math.abs(result.value.semanticEquivalenceScore - prev.semanticEquivalenceScore) /
-          10;
+          Math.abs(result.value.semanticEquivalenceScore - prev.semanticEquivalenceScore) / 10;
         expect(drift).toBeLessThanOrEqual(REGRESSION_THRESHOLD);
       }
       fresh.push({

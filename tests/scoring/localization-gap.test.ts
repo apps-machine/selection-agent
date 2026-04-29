@@ -11,8 +11,10 @@ const ES_DESC =
   "La mejor aplicación para contar calorías. Registra tus comidas y alcanza tus objetivos con un plan de entrenamiento simple.";
 const PT_DESC =
   "O melhor aplicativo para contar calorias. Acompanhe suas refeições e alcance seus objetivos com um plano de treino simples.";
-const JA_DESC = "最高のカロリーカウンターアプリです。食事を記録して、シンプルなワークアウトプランで目標を達成しましょう。";
-const RU_DESC = "Лучшее приложение для подсчёта калорий. Отслеживайте приёмы пищи и достигайте целей.";
+const JA_DESC =
+  "最高のカロリーカウンターアプリです。食事を記録して、シンプルなワークアウトプランで目標を達成しましょう。";
+const RU_DESC =
+  "Лучшее приложение для подсчёта калорий. Отслеживайте приёмы пищи и достигайте целей.";
 
 describe("scoreLocalizationGap", () => {
   test("EN description in US market scores 0 (well localized)", () => {
@@ -76,12 +78,14 @@ describe("scoreLocalizationGap", () => {
 
 describe("scoreLocalizationGap — regression: extended Latin scripts", () => {
   test("Polish description in PL market scores 0", () => {
-    const PL = "Najlepsza aplikacja do liczenia kalorii. Śledź swoje posiłki, łącz się ze znajomymi i osiągaj swoje cele.";
+    const PL =
+      "Najlepsza aplikacja do liczenia kalorii. Śledź swoje posiłki, łącz się ze znajomymi i osiągaj swoje cele.";
     expect(scoreLocalizationGap({ description: PL, market: "pl" })).toBe(0);
   });
 
   test("Turkish description in TR market scores 0", () => {
-    const TR = "Kalori saymak için en iyi uygulama. Yemeklerinizi takip edin ve hedeflerinize daha çok yaklaşın.";
+    const TR =
+      "Kalori saymak için en iyi uygulama. Yemeklerinizi takip edin ve hedeflerinize daha çok yaklaşın.";
     expect(scoreLocalizationGap({ description: TR, market: "tr" })).toBe(0);
   });
 
@@ -93,12 +97,14 @@ describe("scoreLocalizationGap — regression: extended Latin scripts", () => {
 
 describe("scoreLocalizationGap — regression: multi-language markets", () => {
   test("Switzerland market returns neutral (5) regardless of description", () => {
-    const FR = "La meilleure application pour compter les calories. Suivez vos repas et atteignez vos objectifs.";
+    const FR =
+      "La meilleure application pour compter les calories. Suivez vos repas et atteignez vos objectifs.";
     expect(scoreLocalizationGap({ description: FR, market: "ch" })).toBe(5);
   });
 
   test("Belgium market returns neutral (5) regardless of description", () => {
-    const FR = "La meilleure application pour compter les calories. Suivez vos repas et atteignez vos objectifs.";
+    const FR =
+      "La meilleure application pour compter les calories. Suivez vos repas et atteignez vos objectifs.";
     expect(scoreLocalizationGap({ description: FR, market: "be" })).toBe(5);
   });
 });

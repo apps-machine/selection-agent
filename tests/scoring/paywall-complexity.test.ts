@@ -9,9 +9,7 @@ describe("scorePaywallComplexity", () => {
   });
 
   test("returns baseline (3) when IAP present but description is plain", () => {
-    expect(
-      scorePaywallComplexity({ iapPresent: true, description: "Buy more features." }),
-    ).toBe(3);
+    expect(scorePaywallComplexity({ iapPresent: true, description: "Buy more features." })).toBe(3);
   });
 
   test("subscription keywords add signal (>=5)", () => {
@@ -33,8 +31,7 @@ describe("scorePaywallComplexity", () => {
   test("subscription + trial + lifetime scores >=9", () => {
     const s = scorePaywallComplexity({
       iapPresent: true,
-      description:
-        "Free trial available. Monthly subscription or one-time lifetime purchase.",
+      description: "Free trial available. Monthly subscription or one-time lifetime purchase.",
     });
     expect(s).toBeGreaterThanOrEqual(9);
   });

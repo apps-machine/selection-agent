@@ -13,10 +13,7 @@
     "reviews": 89432,
     "ratings": 89432,
     "icon": "https://example.com/calai-icon.png",
-    "screenshots": [
-      "https://example.com/calai-1.png",
-      "https://example.com/calai-2.png"
-    ],
+    "screenshots": ["https://example.com/calai-1.png", "https://example.com/calai-2.png"],
     "released": "2023-01-01T00:00:00Z",
     "updated": "2026-04-01T00:00:00Z"
   },

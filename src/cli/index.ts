@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import { defineCommand, runMain } from "citty";
-import { formatError } from "./errors.ts";
 import { runDemo } from "../demo/run-demo.ts";
+import { formatError } from "./errors.ts";
 
 const main = defineCommand({
   meta: {
@@ -26,13 +26,15 @@ const main = defineCommand({
       },
       async run({ args }) {
         if (args.format !== "markdown" && args.format !== "json") {
-          console.error(formatError({
-            code: "INVALID_FORMAT",
-            message: `unknown --format value "${args.format}"`,
-            cause: "--format accepts 'markdown' or 'json'",
-            fix: "rerun with --format markdown (default) or --format json",
-            docs: "https://github.com/apps-machine/selection-agent#commands",
-          }));
+          console.error(
+            formatError({
+              code: "INVALID_FORMAT",
+              message: `unknown --format value "${args.format}"`,
+              cause: "--format accepts 'markdown' or 'json'",
+              fix: "rerun with --format markdown (default) or --format json",
+              docs: "https://github.com/apps-machine/selection-agent#commands",
+            }),
+          );
           process.exit(2);
         }
         await runDemo({ format: args.format });
@@ -62,38 +64,42 @@ const main = defineCommand({
         },
       },
       async run() {
-        console.error(formatError({
-          code: "NOT_IMPLEMENTED",
-          message: "scan command lands in milestone M2",
-          cause: "Selection Agent is currently scaffolded (M1). Live scrapers + scoring + judges arrive in M2-M6.",
-          fix: "Run `selection-agent demo` to see the agent on cached data, or wait for M2.",
-          docs: "https://github.com/apps-machine/selection-agent#milestones",
-        }));
+        console.error(
+          formatError({
+            code: "NOT_IMPLEMENTED",
+            message: "scan command lands in milestone M2",
+            cause:
+              "Selection Agent is currently scaffolded (M1). Live scrapers + scoring + judges arrive in M2-M6.",
+            fix: "Run `selection-agent demo` to see the agent on cached data, or wait for M2.",
+            docs: "https://github.com/apps-machine/selection-agent#milestones",
+          }),
+        );
         process.exit(2);
       },
     }),
     snapshot: defineCommand({
       meta: {
         name: "snapshot",
-        description:
-          "Daily Track B snapshot writer (velocity scaffolding, activates J14).",
+        description: "Daily Track B snapshot writer (velocity scaffolding, activates J14).",
       },
       async run() {
-        console.error(formatError({
-          code: "NOT_IMPLEMENTED",
-          message: "snapshot command lands in milestone M5",
-          cause: "Track B velocity scaffolding requires daily snapshots accumulated over 14 days.",
-          fix: "Wait for M5, or run `selection-agent demo` for Track A preview.",
-          docs: "https://github.com/apps-machine/selection-agent#milestones",
-        }));
+        console.error(
+          formatError({
+            code: "NOT_IMPLEMENTED",
+            message: "snapshot command lands in milestone M5",
+            cause:
+              "Track B velocity scaffolding requires daily snapshots accumulated over 14 days.",
+            fix: "Wait for M5, or run `selection-agent demo` for Track A preview.",
+            docs: "https://github.com/apps-machine/selection-agent#milestones",
+          }),
+        );
         process.exit(2);
       },
     }),
     report: defineCommand({
       meta: {
         name: "report",
-        description:
-          "Generate reports from accumulated scan data (e.g., judge comparison).",
+        description: "Generate reports from accumulated scan data (e.g., judge comparison).",
       },
       args: {
         "compare-judges": {
@@ -103,13 +109,15 @@ const main = defineCommand({
         },
       },
       async run() {
-        console.error(formatError({
-          code: "NOT_IMPLEMENTED",
-          message: "report command lands in milestone M6",
-          cause: "Reports depend on judge results persisted in M4 + orchestrator pipeline in M6.",
-          fix: "Wait for M6, or run `selection-agent demo` for the markdown brief preview.",
-          docs: "https://github.com/apps-machine/selection-agent#milestones",
-        }));
+        console.error(
+          formatError({
+            code: "NOT_IMPLEMENTED",
+            message: "report command lands in milestone M6",
+            cause: "Reports depend on judge results persisted in M4 + orchestrator pipeline in M6.",
+            fix: "Wait for M6, or run `selection-agent demo` for the markdown brief preview.",
+            docs: "https://github.com/apps-machine/selection-agent#milestones",
+          }),
+        );
         process.exit(2);
       },
     }),

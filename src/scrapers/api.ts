@@ -78,9 +78,7 @@ export function mapToRawAppData(args: MapToRawArgs): RawAppData {
   const category = entry.primaryGenre ?? entry.genre ?? "Unknown";
   const developer = asString(entry.developer);
   const priceUsd =
-    typeof entry.price === "number" && (entry.currency === "USD" || entry.free)
-      ? entry.price
-      : 0;
+    typeof entry.price === "number" && (entry.currency === "USD" || entry.free) ? entry.price : 0;
   return {
     store,
     appId: entry.appId,
@@ -94,8 +92,8 @@ export function mapToRawAppData(args: MapToRawArgs): RawAppData {
       typeof entry.ratings === "number"
         ? entry.ratings
         : typeof entry.reviews === "number"
-        ? entry.reviews
-        : null,
+          ? entry.reviews
+          : null,
     priceUsd,
     iapPresent: detectIap(entry),
     description: entry.description ?? "",

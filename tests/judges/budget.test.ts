@@ -2,8 +2,8 @@ import { describe, expect, test } from "bun:test";
 import {
   CostBudget,
   DEFAULT_BUDGET_USD,
-  MODEL_PRICING_USD_PER_MTOK,
   estimateCallCostUsd,
+  MODEL_PRICING_USD_PER_MTOK,
 } from "../../src/judges/budget.ts";
 
 describe("MODEL_PRICING_USD_PER_MTOK", () => {
@@ -82,9 +82,9 @@ describe("CostBudget", () => {
 
   test("recordAndAssert throws inline when next call would exceed cap", () => {
     const b = new CostBudget({ capUsd: 0.0005 });
-    expect(() =>
-      b.recordAndAssert({ model: "claude-sonnet-4-6", input: 100, output: 50 }),
-    ).toThrow(/budget/i);
+    expect(() => b.recordAndAssert({ model: "claude-sonnet-4-6", input: 100, output: 50 })).toThrow(
+      /budget/i,
+    );
   });
 
   test("recordAndAssert under cap does not throw", () => {

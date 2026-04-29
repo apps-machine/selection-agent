@@ -1,10 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { Cache } from "../../src/storage/cache.ts";
-import {
-  scrapeCharts,
-  type ChartScrapeJob,
-} from "../../src/scrapers/chart-scraper.ts";
 import type { ChartEntry, ScraperLib } from "../../src/scrapers/api.ts";
+import { type ChartScrapeJob, scrapeCharts } from "../../src/scrapers/chart-scraper.ts";
+import { Cache } from "../../src/storage/cache.ts";
 
 function makeStubClient(entries: ChartEntry[]): ScraperLib {
   return {
@@ -25,9 +22,7 @@ describe("scrapeCharts", () => {
       { appId: "com.a.first", title: "First" },
       { appId: "com.a.second", title: "Second" },
     ]);
-    const google = makeStubClient([
-      { appId: "com.g.first", title: "First G" },
-    ]);
+    const google = makeStubClient([{ appId: "com.g.first", title: "First G" }]);
     const jobs: ChartScrapeJob[] = [
       { store: "apple", market: "US", collection: "top-grossing", limit: 10 },
       { store: "google", market: "BR", collection: "top-grossing", limit: 10 },

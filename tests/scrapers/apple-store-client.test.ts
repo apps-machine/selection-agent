@@ -1,15 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import {
-  createAppleScraperLib,
-  type AppleScraperLib,
-} from "../../src/scrapers/apple-store-client.ts";
 import { mapToRawAppData } from "../../src/scrapers/api.ts";
-import grossingFixture from "../fixtures/apple-grossing-us.json" with {
-  type: "json",
-};
-import appDetailFixture from "../fixtures/apple-app-detail.json" with {
-  type: "json",
-};
+import {
+  type AppleScraperLib,
+  createAppleScraperLib,
+} from "../../src/scrapers/apple-store-client.ts";
+import appDetailFixture from "../fixtures/apple-app-detail.json" with { type: "json" };
+import grossingFixture from "../fixtures/apple-grossing-us.json" with { type: "json" };
 
 function makeMock(overrides: Partial<AppleScraperLib> = {}): AppleScraperLib {
   return {

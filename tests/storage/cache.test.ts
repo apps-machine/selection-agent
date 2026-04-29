@@ -93,8 +93,8 @@ describe("Cache", () => {
 });
 
 describe("Cache schema validation", () => {
-  let now = 1_000_000;
-  const cache = (() => {
+  const now = 1_000_000;
+  const _cache = (() => {
     return Cache.open(":memory:", { clock: () => now });
   })();
 });

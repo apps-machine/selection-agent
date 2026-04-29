@@ -1,17 +1,7 @@
-import type {
-  AppDetails,
-  ChartEntry,
-  ChartQuery,
-  AppQuery,
-  ScraperLib,
-} from "./api.ts";
+import type { AppDetails, AppQuery, ChartEntry, ChartQuery, ScraperLib } from "./api.ts";
 
 export interface GoogleScraperLib {
-  list(opts: {
-    collection: string;
-    country: string;
-    num: number;
-  }): Promise<unknown[]>;
+  list(opts: { collection: string; country: string; num: number }): Promise<unknown[]>;
   app(opts: { appId: string; country: string }): Promise<unknown>;
   collection: Record<string, string>;
 }
@@ -24,9 +14,8 @@ const GOOGLE_COLLECTION_MAP: Record<string, string> = {
 
 function normalizeGoogleEntry(raw: unknown): ChartEntry {
   const o = raw as Record<string, unknown>;
-  const developer = typeof o.developer === "string"
-    ? o.developer
-    : (o.developerId as string | undefined);
+  const developer =
+    typeof o.developer === "string" ? o.developer : (o.developerId as string | undefined);
   return {
     appId: String(o.appId ?? ""),
     title: typeof o.title === "string" ? o.title : undefined,
@@ -45,11 +34,9 @@ function normalizeGoogleEntry(raw: unknown): ChartEntry {
       typeof o.summary === "string"
         ? o.summary
         : typeof o.description === "string"
-        ? o.description
-        : undefined,
-    screenshots: Array.isArray(o.screenshots)
-      ? (o.screenshots as string[])
-      : undefined,
+          ? o.description
+          : undefined,
+    screenshots: Array.isArray(o.screenshots) ? (o.screenshots as string[]) : undefined,
     released: typeof o.released === "string" ? o.released : undefined,
     updated: typeof o.updated === "string" ? o.updated : undefined,
   };
@@ -88,8 +75,8 @@ export function createGoogleScraperLib(lib: GoogleScraperLib): ScraperLib {
           typeof o.offersIAP === "boolean"
             ? o.offersIAP
             : typeof o.IAPRange === "string"
-            ? true
-            : undefined,
+              ? true
+              : undefined,
       };
     },
   };
@@ -98,7 +85,7 @@ export function createGoogleScraperLib(lib: GoogleScraperLib): ScraperLib {
 export async function loadDefaultGoogleClient(): Promise<ScraperLib> {
   const mod = await import("google-play-scraper");
   const lib =
-    ((mod as unknown as { default?: GoogleScraperLib }).default
-      ?? (mod as unknown as GoogleScraperLib));
+    (mod as unknown as { default?: GoogleScraperLib }).default ??
+    (mod as unknown as GoogleScraperLib);
   return createGoogleScraperLib(lib);
 }

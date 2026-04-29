@@ -1,14 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import {
-  err,
-  isErr,
-  isOk,
-  map,
-  ok,
-  tryAsync,
-  unwrap,
-  type Result,
-} from "../../src/util/result.ts";
+import { err, isErr, isOk, map, ok, type Result, tryAsync, unwrap } from "../../src/util/result.ts";
 
 describe("Result", () => {
   test("ok and isOk", () => {

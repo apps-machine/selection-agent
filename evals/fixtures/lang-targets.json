@@ -2,11 +2,36 @@
   "version": 1,
   "comment": "Phase 0 lang-quality eval target markets, founder-confirmed 2026-04-29.",
   "targets": [
-    { "language": "en",    "market": "us", "isBaseline": true,  "comment": "EN baseline; expected near-perfect equivalence" },
-    { "language": "ja",    "market": "jp", "isBaseline": false, "comment": "Japanese, distinct script + culture" },
-    { "language": "de",    "market": "de", "isBaseline": false, "comment": "German, compound nouns" },
-    { "language": "fr",    "market": "fr", "isBaseline": false, "comment": "French, gendered + formal register" },
-    { "language": "pt-BR", "market": "br", "isBaseline": false, "comment": "Brazilian Portuguese, distinct from EU PT" },
-    { "language": "es",    "market": "es", "isBaseline": false, "comment": "European Spanish (es-ES, not es-MX)" }
+    {
+      "language": "en",
+      "market": "us",
+      "isBaseline": true,
+      "comment": "EN baseline; expected near-perfect equivalence"
+    },
+    {
+      "language": "ja",
+      "market": "jp",
+      "isBaseline": false,
+      "comment": "Japanese, distinct script + culture"
+    },
+    { "language": "de", "market": "de", "isBaseline": false, "comment": "German, compound nouns" },
+    {
+      "language": "fr",
+      "market": "fr",
+      "isBaseline": false,
+      "comment": "French, gendered + formal register"
+    },
+    {
+      "language": "pt-BR",
+      "market": "br",
+      "isBaseline": false,
+      "comment": "Brazilian Portuguese, distinct from EU PT"
+    },
+    {
+      "language": "es",
+      "market": "es",
+      "isBaseline": false,
+      "comment": "European Spanish (es-ES, not es-MX)"
+    }
   ]
 }

@@ -27,10 +27,7 @@ export async function retryWithBackoff<T>(
       lastError = e;
       if (attempt === merged.maxAttempts) break;
       if (opts.shouldRetry && !opts.shouldRetry(e, attempt)) break;
-      const exp = Math.min(
-        merged.initialDelayMs * 2 ** (attempt - 1),
-        merged.maxDelayMs,
-      );
+      const exp = Math.min(merged.initialDelayMs * 2 ** (attempt - 1), merged.maxDelayMs);
       // Full jitter (Math.random() * exp) avoids thundering-herd retry clustering
       // when multiple parallel jobs hit the same 429 simultaneously.
       const delay = merged.jitter ? Math.random() * exp : exp;
@@ -56,9 +53,10 @@ export function isTransientHttpError(err: unknown): boolean {
   if (typeof status === "number") {
     return status === 429 || status === 503 || (status >= 500 && status < 600);
   }
-  const msg = (err && typeof err === "object" && "message" in err
-    ? String((err as { message: unknown }).message)
-    : "");
+  const msg =
+    err && typeof err === "object" && "message" in err
+      ? String((err as { message: unknown }).message)
+      : "";
   return /ECONNRESET|ETIMEDOUT|ENETUNREACH|EAI_AGAIN|ECONNREFUSED|ENOTFOUND|socket hang up|UND_ERR_/i.test(
     msg,
   );

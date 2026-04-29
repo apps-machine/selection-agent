@@ -1,7 +1,7 @@
-import { Cache } from "../storage/cache.ts";
+import type { Cache } from "../storage/cache.ts";
 import type { Store } from "../types/raw-app-data.ts";
 import type { RateLimiter } from "../util/rate-limit.ts";
-import { resilient, type ResilientCache } from "../util/resilient.ts";
+import { type ResilientCache, resilient } from "../util/resilient.ts";
 
 export interface ReviewSnippet {
   appId: string;
@@ -24,27 +24,11 @@ export interface ReviewScraperLib {
 
 import { buildCacheKey } from "../storage/cache-key.ts";
 
-function reviewCacheKey(
-  store: Store,
-  market: string,
-  appId: string,
-  page: number,
-): string {
-  return buildCacheKey(
-    "reviews",
-    store,
-    market.toLowerCase(),
-    appId,
-    `p${page}`,
-  );
+function reviewCacheKey(store: Store, market: string, appId: string, page: number): string {
+  return buildCacheKey("reviews", store, market.toLowerCase(), appId, `p${page}`);
 }
 
-function normalizeReview(
-  raw: unknown,
-  store: Store,
-  market: string,
-  appId: string,
-): ReviewSnippet {
+function normalizeReview(raw: unknown, store: Store, market: string, appId: string): ReviewSnippet {
   const o = raw as Record<string, unknown>;
   return {
     appId,
@@ -54,22 +38,12 @@ function normalizeReview(
       typeof o.userName === "string"
         ? o.userName
         : typeof o.author === "string"
-        ? o.author
-        : "anonymous",
-    rating:
-      typeof o.score === "number" ? o.score : typeof o.rating === "number" ? o.rating : 0,
-    text:
-      typeof o.text === "string"
-        ? o.text
-        : typeof o.title === "string"
-        ? o.title
-        : "",
+          ? o.author
+          : "anonymous",
+    rating: typeof o.score === "number" ? o.score : typeof o.rating === "number" ? o.rating : 0,
+    text: typeof o.text === "string" ? o.text : typeof o.title === "string" ? o.title : "",
     postedAt:
-      typeof o.date === "string"
-        ? o.date
-        : typeof o.updated === "string"
-        ? o.updated
-        : null,
+      typeof o.date === "string" ? o.date : typeof o.updated === "string" ? o.updated : null,
   };
 }
 
@@ -80,11 +54,7 @@ export interface ReviewScrapeOptions {
   fallback?: ReviewScraperLib;
   /** Optional global rate limiter (shared with chart-scraper / app-scraper). */
   rateLimiter?: RateLimiter;
-  logger?: (
-    level: "info" | "warn" | "error",
-    msg: string,
-    ctx?: Record<string, unknown>,
-  ) => void;
+  logger?: (level: "info" | "warn" | "error", msg: string, ctx?: Record<string, unknown>) => void;
 }
 
 function rateLimited<T>(

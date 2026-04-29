@@ -160,8 +160,7 @@ function pickJsonLdApp(parsed: unknown): JsonLdMobileApp | null {
 export function parseAppHtml(html: string): AppDetails | null {
   // Apple app pages may emit MULTIPLE JSON-LD blocks (BreadcrumbList, Product,
   // MobileApplication). Iterate every block and try to find MobileApplication.
-  const blockPattern =
-    /<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi;
+  const blockPattern = /<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi;
   for (const match of html.matchAll(blockPattern)) {
     let parsed: unknown;
     try {
@@ -191,9 +190,7 @@ export function parseAppHtml(html: string): AppDetails | null {
   return null;
 }
 
-export function createPlaywrightAppleFallback(
-  opts: PlaywrightFallbackOptions = {},
-): ScraperLib {
+export function createPlaywrightAppleFallback(opts: PlaywrightFallbackOptions = {}): ScraperLib {
   const launch = opts.launchBrowser ?? defaultLaunchBrowser;
   const timeout = opts.timeoutMs ?? DEFAULT_TIMEOUT;
 

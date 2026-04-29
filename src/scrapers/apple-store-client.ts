@@ -1,18 +1,8 @@
-import type {
-  AppDetails,
-  ChartEntry,
-  ChartQuery,
-  AppQuery,
-  ScraperLib,
-} from "./api.ts";
+import type { AppDetails, AppQuery, ChartEntry, ChartQuery, ScraperLib } from "./api.ts";
 
 /** Subset of `app-store-scraper` we use. Allows injecting a mock in tests. */
 export interface AppleScraperLib {
-  list(opts: {
-    collection: string;
-    country: string;
-    num: number;
-  }): Promise<unknown[]>;
+  list(opts: { collection: string; country: string; num: number }): Promise<unknown[]>;
   app(opts: { id?: string; appId?: string; country: string }): Promise<unknown>;
   collection: Record<string, string>;
 }
@@ -30,7 +20,8 @@ function normalizeAppleEntry(raw: unknown): ChartEntry {
     appId: String(id ?? ""),
     title: typeof o.title === "string" ? o.title : (o.trackName as string | undefined),
     developer: typeof o.developer === "string" ? o.developer : (o.artistName as string | undefined),
-    primaryGenre: typeof o.primaryGenre === "string" ? o.primaryGenre : (o.genre as string | undefined),
+    primaryGenre:
+      typeof o.primaryGenre === "string" ? o.primaryGenre : (o.genre as string | undefined),
     genre: typeof o.genre === "string" ? o.genre : undefined,
     price: typeof o.price === "number" ? o.price : undefined,
     currency: typeof o.currency === "string" ? o.currency : undefined,
@@ -40,9 +31,7 @@ function normalizeAppleEntry(raw: unknown): ChartEntry {
     ratings: typeof o.ratings === "number" ? o.ratings : undefined,
     icon: typeof o.icon === "string" ? o.icon : undefined,
     description: typeof o.description === "string" ? o.description : undefined,
-    screenshots: Array.isArray(o.screenshots)
-      ? (o.screenshots as string[])
-      : undefined,
+    screenshots: Array.isArray(o.screenshots) ? (o.screenshots as string[]) : undefined,
     released: typeof o.released === "string" ? o.released : undefined,
     updated: typeof o.updated === "string" ? o.updated : undefined,
   };
@@ -77,8 +66,7 @@ export function createAppleScraperLib(lib: AppleScraperLib): ScraperLib {
       const o = raw as Record<string, unknown>;
       return {
         ...entry,
-        inAppPurchases:
-          typeof o.inAppPurchases === "boolean" ? o.inAppPurchases : undefined,
+        inAppPurchases: typeof o.inAppPurchases === "boolean" ? o.inAppPurchases : undefined,
       };
     },
   };
@@ -87,7 +75,8 @@ export function createAppleScraperLib(lib: AppleScraperLib): ScraperLib {
 /** Convenience: load the real `app-store-scraper` and return a wired-up client. */
 export async function loadDefaultAppleClient(): Promise<ScraperLib> {
   const mod = await import("app-store-scraper");
-  const lib = (mod as unknown as { default?: AppleScraperLib }).default
-    ?? (mod as unknown as AppleScraperLib);
+  const lib =
+    (mod as unknown as { default?: AppleScraperLib }).default ??
+    (mod as unknown as AppleScraperLib);
   return createAppleScraperLib(lib);
 }

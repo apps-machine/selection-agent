@@ -1,8 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import {
-  isTransientHttpError,
-  retryWithBackoff,
-} from "../../src/util/retry.ts";
+import { isTransientHttpError, retryWithBackoff } from "../../src/util/retry.ts";
 
 describe("retryWithBackoff", () => {
   test("returns value on first success", async () => {
@@ -85,11 +82,11 @@ describe("retryWithBackoff", () => {
 
   test("backoff grows exponentially without jitter", async () => {
     const delays: number[] = [];
-    let calls = 0;
+    let _calls = 0;
     try {
       await retryWithBackoff(
         async () => {
-          calls++;
+          _calls++;
           throw new Error("x");
         },
         {

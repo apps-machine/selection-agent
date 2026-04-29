@@ -1,8 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import {
-  type JudgeClient,
-  judgeAppText,
-} from "../../src/judges/text-judge.ts";
+import { type JudgeClient, judgeAppText } from "../../src/judges/text-judge.ts";
 import type { RawAppData } from "../../src/types/raw-app-data.ts";
 import { isErr, isOk } from "../../src/util/result.ts";
 
@@ -110,9 +107,7 @@ const validToolInput = {
 
 describe("judgeAppText", () => {
   test("happy path: returns ok with a TextJudgeResult", async () => {
-    const { client, captured } = makeMockClient([
-      { kind: "ok", toolInput: validToolInput },
-    ]);
+    const { client, captured } = makeMockClient([{ kind: "ok", toolInput: validToolInput }]);
     const result = await judgeAppText({ app: sampleApp, client });
     expect(isOk(result)).toBe(true);
     if (!result.ok) throw new Error("unreachable");
@@ -125,17 +120,13 @@ describe("judgeAppText", () => {
   });
 
   test("uses claude-sonnet-4-6 by default", async () => {
-    const { client, captured } = makeMockClient([
-      { kind: "ok", toolInput: validToolInput },
-    ]);
+    const { client, captured } = makeMockClient([{ kind: "ok", toolInput: validToolInput }]);
     await judgeAppText({ app: sampleApp, client });
     expect(captured.model).toBe("claude-sonnet-4-6");
   });
 
   test("respects explicit model override", async () => {
-    const { client, captured } = makeMockClient([
-      { kind: "ok", toolInput: validToolInput },
-    ]);
+    const { client, captured } = makeMockClient([{ kind: "ok", toolInput: validToolInput }]);
     await judgeAppText({
       app: sampleApp,
       client,
@@ -145,9 +136,7 @@ describe("judgeAppText", () => {
   });
 
   test("prompt includes app metadata + market", async () => {
-    const { client, captured } = makeMockClient([
-      { kind: "ok", toolInput: validToolInput },
-    ]);
+    const { client, captured } = makeMockClient([{ kind: "ok", toolInput: validToolInput }]);
     await judgeAppText({ app: sampleApp, client });
     expect(captured.promptText).toContain("FocusFlow");
     expect(captured.promptText).toContain("br");
@@ -172,9 +161,7 @@ describe("judgeAppText", () => {
 
   test("does NOT retry on fatal 401", async () => {
     const e401 = Object.assign(new Error("invalid api key"), { status: 401 });
-    const { client, captured } = makeMockClient([
-      { kind: "throw", error: e401 },
-    ]);
+    const { client, captured } = makeMockClient([{ kind: "throw", error: e401 }]);
     const result = await judgeAppText({
       app: sampleApp,
       client,
@@ -201,9 +188,7 @@ describe("judgeAppText", () => {
   });
 
   test("invokes onTokenUsage callback with token counts", async () => {
-    const { client } = makeMockClient([
-      { kind: "ok", toolInput: validToolInput },
-    ]);
+    const { client } = makeMockClient([{ kind: "ok", toolInput: validToolInput }]);
     let captured: { input: number; output: number; model: string } | null = null;
     await judgeAppText({
       app: sampleApp,

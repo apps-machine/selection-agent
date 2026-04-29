@@ -5,7 +5,8 @@ export interface PaywallScoreInput {
 
 const BASELINE_IAP = 3;
 
-const SUBSCRIPTION_RE = /\b(subscription|subscribe|monthly|yearly|annual)\b|\/(?:month|mo|year|yr)\b|per\s+(?:month|year)/i;
+const SUBSCRIPTION_RE =
+  /\b(subscription|subscribe|monthly|yearly|annual)\b|\/(?:month|mo|year|yr)\b|per\s+(?:month|year)/i;
 const TRIAL_RE = /\b(free trial|trial period|\d+[- ]day(?: free)? trial|try (it )?free)\b/i;
 const LIFETIME_RE = /\b(lifetime|one[- ]?time|forever|permanent purchase)\b/i;
 const TIER_RE = /\b(pro|premium|plus|elite|ultimate|gold|platinum)\b/gi;
@@ -20,9 +21,7 @@ export function scorePaywallComplexity(input: PaywallScoreInput): number {
   if (LIFETIME_RE.test(desc)) score += 2;
 
   const tierMatches = desc.match(TIER_RE);
-  const distinctTiers = tierMatches
-    ? new Set(tierMatches.map((t) => t.toLowerCase())).size
-    : 0;
+  const distinctTiers = tierMatches ? new Set(tierMatches.map((t) => t.toLowerCase())).size : 0;
   if (distinctTiers >= 2) score += 1;
 
   return Math.max(0, Math.min(10, score));

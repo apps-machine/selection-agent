@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { resilient, type ResilientCache } from "../../src/util/resilient.ts";
+import { type ResilientCache, resilient } from "../../src/util/resilient.ts";
 
 function makeCache<T>(initial?: { value: T; createdAt: number }): ResilientCache<T> & {
   store: { value: T; createdAt: number } | null;

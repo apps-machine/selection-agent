@@ -1,12 +1,12 @@
-import { type Result, err, ok } from "../util/result.ts";
+import type { RawAppData } from "../types/raw-app-data.ts";
+import { err, ok, type Result } from "../util/result.ts";
 import {
-  type RetryOptions,
   isFatalHttpError,
   isTransientHttpError,
+  type RetryOptions,
   retryWithBackoff,
 } from "../util/retry.ts";
-import type { RawAppData } from "../types/raw-app-data.ts";
-import { TextJudgeResultSchema, type TextJudgeResult } from "./schemas.ts";
+import { type TextJudgeResult, TextJudgeResultSchema } from "./schemas.ts";
 
 export const DEFAULT_TEXT_JUDGE_MODEL = "claude-sonnet-4-6";
 const TOOL_NAME = "score_localization_gap";
@@ -103,8 +103,7 @@ const TEXT_JUDGE_TOOL_SCHEMA = {
       type: "number",
       minimum: 0,
       maximum: 1,
-      description:
-        "0-1 confidence in the score given the metadata available.",
+      description: "0-1 confidence in the score given the metadata available.",
     },
   },
   required: ["locGapScore", "reasoning", "signals", "confidence"],
@@ -153,8 +152,7 @@ export async function judgeAppText(
     tools: [
       {
         name: TOOL_NAME,
-        description:
-          "Emit the localization gap score and reasoning for the given app+market.",
+        description: "Emit the localization gap score and reasoning for the given app+market.",
         input_schema: TEXT_JUDGE_TOOL_SCHEMA,
       },
     ],
@@ -202,9 +200,7 @@ export async function judgeAppText(
   const parsed = TextJudgeResultSchema.safeParse(candidate);
   if (!parsed.success) {
     return err(
-      new Error(
-        `text-judge: tool input failed schema validation: ${parsed.error.message}`,
-      ),
+      new Error(`text-judge: tool input failed schema validation: ${parsed.error.message}`),
     );
   }
   return ok(parsed.data);

@@ -12,10 +12,7 @@
  *   buildCacheKey("app", "google", "br", "com.evil:chart:apple:us")
  *   -> "app:google:br:com.evil%3Achart%3Aapple%3Aus"
  */
-export function buildCacheKey(
-  kind: string,
-  ...segments: ReadonlyArray<string | number>
-): string {
+export function buildCacheKey(kind: string, ...segments: ReadonlyArray<string | number>): string {
   const encoded = segments.map((s) => encodeURIComponent(String(s)));
   return [kind, ...encoded].join(":");
 }

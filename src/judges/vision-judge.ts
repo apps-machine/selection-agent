@@ -1,15 +1,12 @@
-import { type Result, err, ok } from "../util/result.ts";
+import type { RawAppData } from "../types/raw-app-data.ts";
+import { err, ok, type Result } from "../util/result.ts";
 import {
-  type RetryOptions,
   isFatalHttpError,
   isTransientHttpError,
+  type RetryOptions,
   retryWithBackoff,
 } from "../util/retry.ts";
-import type { RawAppData } from "../types/raw-app-data.ts";
-import {
-  VisionJudgeResultSchema,
-  type VisionJudgeResult,
-} from "./schemas.ts";
+import { type VisionJudgeResult, VisionJudgeResultSchema } from "./schemas.ts";
 
 export const DEFAULT_VISION_JUDGE_MODEL = "claude-sonnet-4-6";
 export const DEFAULT_MAX_SCREENSHOTS = 5;
@@ -34,10 +31,7 @@ interface AnthropicToolUseBlock {
   name: string;
   input: unknown;
 }
-type AnthropicContentBlock =
-  | AnthropicTextBlock
-  | AnthropicImageBlock
-  | AnthropicToolUseBlock;
+type AnthropicContentBlock = AnthropicTextBlock | AnthropicImageBlock | AnthropicToolUseBlock;
 type UserContentBlock = AnthropicTextBlock | AnthropicImageBlock;
 
 interface AnthropicMessage {
@@ -229,10 +223,7 @@ export async function judgeAppVision(
 
   const model = opts.model ?? DEFAULT_VISION_JUDGE_MODEL;
   const promptText = buildPromptText(opts.app, fetched);
-  const userContent: UserContentBlock[] = [
-    ...blocks,
-    { type: "text", text: promptText },
-  ];
+  const userContent: UserContentBlock[] = [...blocks, { type: "text", text: promptText }];
 
   const params: AnthropicMessageCreateParams = {
     model,
@@ -241,8 +232,7 @@ export async function judgeAppVision(
     tools: [
       {
         name: TOOL_NAME,
-        description:
-          "Emit cultural fit score for the given screenshots and target market.",
+        description: "Emit cultural fit score for the given screenshots and target market.",
         input_schema: VISION_JUDGE_TOOL_SCHEMA,
       },
     ],
@@ -251,21 +241,18 @@ export async function judgeAppVision(
 
   let response: AnthropicMessage;
   try {
-    response = await retryWithBackoff(
-      () => opts.client.messages.create(params),
-      {
-        initialDelayMs: 1000,
-        maxDelayMs: 8000,
-        jitter: true,
-        maxAttempts: 3,
-        ...opts.retry,
-        shouldRetry: (e, attempt) => {
-          if (isFatalHttpError(e)) return false;
-          if (opts.retry?.shouldRetry) return opts.retry.shouldRetry(e, attempt);
-          return isTransientHttpError(e);
-        },
+    response = await retryWithBackoff(() => opts.client.messages.create(params), {
+      initialDelayMs: 1000,
+      maxDelayMs: 8000,
+      jitter: true,
+      maxAttempts: 3,
+      ...opts.retry,
+      shouldRetry: (e, attempt) => {
+        if (isFatalHttpError(e)) return false;
+        if (opts.retry?.shouldRetry) return opts.retry.shouldRetry(e, attempt);
+        return isTransientHttpError(e);
       },
-    );
+    });
   } catch (e) {
     return err(e instanceof Error ? e : new Error(String(e)));
   }
@@ -294,9 +281,7 @@ export async function judgeAppVision(
   const parsed = VisionJudgeResultSchema.safeParse(candidate);
   if (!parsed.success) {
     return err(
-      new Error(
-        `vision-judge: tool input failed schema validation: ${parsed.error.message}`,
-      ),
+      new Error(`vision-judge: tool input failed schema validation: ${parsed.error.message}`),
     );
   }
   return ok(parsed.data);

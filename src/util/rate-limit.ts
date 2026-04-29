@@ -13,8 +13,7 @@ export interface TokenBucketOptions {
   sleep?: (ms: number) => Promise<void>;
 }
 
-const defaultSleep = (ms: number) =>
-  new Promise<void>((resolve) => setTimeout(resolve, ms));
+const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 export class TokenBucket {
   private readonly capacity: number;
@@ -29,8 +28,7 @@ export class TokenBucket {
 
   constructor(opts: TokenBucketOptions) {
     if (opts.capacity <= 0) throw new Error("TokenBucket: capacity must be > 0");
-    if (opts.refillPerSecond <= 0)
-      throw new Error("TokenBucket: refillPerSecond must be > 0");
+    if (opts.refillPerSecond <= 0) throw new Error("TokenBucket: refillPerSecond must be > 0");
     this.capacity = opts.capacity;
     this.refillPerSecond = opts.refillPerSecond;
     this.clock = opts.clock ?? Date.now;
@@ -65,10 +63,7 @@ export class TokenBucket {
     const now = this.clock();
     const elapsedSec = (now - this.lastRefillMs) / 1000;
     if (elapsedSec > 0) {
-      this.tokens = Math.min(
-        this.capacity,
-        this.tokens + elapsedSec * this.refillPerSecond,
-      );
+      this.tokens = Math.min(this.capacity, this.tokens + elapsedSec * this.refillPerSecond);
       this.lastRefillMs = now;
     }
   }

@@ -1,15 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import {
-  type LangQualityClient,
   evaluateLanguageQuality,
+  type LangQualityClient,
 } from "../../src/judges/lang-quality-eval.ts";
 import { isErr, isOk } from "../../src/util/result.ts";
 
-const phrases = [
-  "Unlock premium",
-  "Start free trial",
-  "Track your progress",
-];
+const phrases = ["Unlock premium", "Start free trial", "Track your progress"];
 
 interface MockResponse {
   toolName: string;
@@ -72,11 +68,7 @@ describe("evaluateLanguageQuality", () => {
       {
         toolName: "back_translate_phrases",
         input: {
-          backTranslations: [
-            "Unlock premium",
-            "Start free trial",
-            "Track your progress",
-          ],
+          backTranslations: ["Unlock premium", "Start free trial", "Track your progress"],
         },
       },
       {

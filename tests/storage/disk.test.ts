@@ -15,8 +15,6 @@ describe("disk", () => {
 
   test("assertDiskSpace throws when threshold exceeds free space", () => {
     const d = checkDiskSpace(".");
-    expect(() => assertDiskSpace(".", d.freeBytes + 1_000_000_000)).toThrow(
-      /disk space too low/,
-    );
+    expect(() => assertDiskSpace(".", d.freeBytes + 1_000_000_000)).toThrow(/disk space too low/);
   });
 });

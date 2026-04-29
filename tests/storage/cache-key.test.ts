@@ -11,18 +11,10 @@ describe("buildCacheKey", () => {
   test("encodes colons in user-provided segments to prevent collisions", () => {
     const malicious = "com.evil:chart:apple:us:top-grossing:200";
     const collidingKey = buildCacheKey("app", "google", "br", malicious);
-    const chartKey = buildCacheKey(
-      "chart",
-      "apple",
-      "us",
-      "top-grossing",
-      200,
-    );
+    const chartKey = buildCacheKey("chart", "apple", "us", "top-grossing", 200);
     expect(collidingKey).not.toBe(chartKey);
     expect(collidingKey).toContain("%3A");
-    expect(collidingKey).toBe(
-      "app:google:br:com.evil%3Achart%3Aapple%3Aus%3Atop-grossing%3A200",
-    );
+    expect(collidingKey).toBe("app:google:br:com.evil%3Achart%3Aapple%3Aus%3Atop-grossing%3A200");
   });
 
   test("encodes spaces and unicode safely", () => {

@@ -2,12 +2,11 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import Anthropic from "@anthropic-ai/sdk";
-import cases from "./fixtures/text-judge-cases.json";
 import { type JudgeClient, judgeAppText } from "../src/judges/text-judge.ts";
 import { RawAppDataSchema } from "../src/types/raw-app-data.ts";
+import cases from "./fixtures/text-judge-cases.json";
 
-const SHOULD_RUN =
-  process.env.EVALS === "1" && typeof process.env.ANTHROPIC_API_KEY === "string";
+const SHOULD_RUN = process.env.EVALS === "1" && typeof process.env.ANTHROPIC_API_KEY === "string";
 
 const BASELINE_PATH = join(
   dirname(new URL(import.meta.url).pathname),
@@ -34,10 +33,7 @@ function loadBaseline(): Record<string, BaselineEntry> {
 
 function saveBaseline(entries: BaselineEntry[]): void {
   mkdirSync(dirname(BASELINE_PATH), { recursive: true });
-  writeFileSync(
-    BASELINE_PATH,
-    JSON.stringify({ version: 1, entries }, null, 2) + "\n",
-  );
+  writeFileSync(BASELINE_PATH, `${JSON.stringify({ version: 1, entries }, null, 2)}\n`);
 }
 
 describe.skipIf(!SHOULD_RUN)("text-judge eval (live LLM, EVALS=1)", () => {
@@ -50,13 +46,13 @@ describe.skipIf(!SHOULD_RUN)("text-judge eval (live LLM, EVALS=1)", () => {
       const app = RawAppDataSchema.parse(c.app);
       const result = await judgeAppText({ app, client });
       if (!result.ok) {
-        throw new Error(
-          `judgeAppText failed for ${c.id}: ${result.error.message}`,
-        );
+        throw new Error(`judgeAppText failed for ${c.id}: ${result.error.message}`);
       }
       const r = result.value;
-      const min = "expectedLocGapMin" in c ? (c as { expectedLocGapMin: number }).expectedLocGapMin : 0;
-      const max = "expectedLocGapMax" in c ? (c as { expectedLocGapMax: number }).expectedLocGapMax : 10;
+      const min =
+        "expectedLocGapMin" in c ? (c as { expectedLocGapMin: number }).expectedLocGapMin : 0;
+      const max =
+        "expectedLocGapMax" in c ? (c as { expectedLocGapMax: number }).expectedLocGapMax : 10;
       expect(r.locGapScore).toBeGreaterThanOrEqual(min);
       expect(r.locGapScore).toBeLessThanOrEqual(max);
 

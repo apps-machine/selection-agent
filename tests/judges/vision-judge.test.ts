@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import {
   type ImageFetcher,
-  type VisionJudgeClient,
   judgeAppVision,
+  type VisionJudgeClient,
 } from "../../src/judges/vision-judge.ts";
 import type { RawAppData } from "../../src/types/raw-app-data.ts";
 import { isErr, isOk } from "../../src/util/result.ts";
@@ -71,8 +71,7 @@ function makeMockClient(
         captured.model = params.model;
         captured.toolName = params.tools?.[0]?.name ?? "";
         const blocks = params.messages[0]?.content ?? [];
-        captured.imagesIncluded = blocks.filter((b) => b.type === "image")
-          .length;
+        captured.imagesIncluded = blocks.filter((b) => b.type === "image").length;
         const r = responses[idx];
         if (!r) throw new Error(`no mock response at idx ${idx}`);
         if (r.kind === "throw") throw r.error;
@@ -108,10 +107,7 @@ function makeMockClient(
 }
 
 function fetcherWith(
-  results: Record<
-    string,
-    { mediaType: string; base64: string } | { error: Error }
-  >,
+  results: Record<string, { mediaType: string; base64: string } | { error: Error }>,
 ): ImageFetcher {
   return async (url) => {
     const r = results[url];
@@ -123,9 +119,7 @@ function fetcherWith(
 
 describe("judgeAppVision", () => {
   test("happy path: fetches all 3 screenshots, returns ok with screenshotsAnalyzed=3", async () => {
-    const { client, captured } = makeMockClient([
-      { kind: "ok", toolInput: validToolInput },
-    ]);
+    const { client, captured } = makeMockClient([{ kind: "ok", toolInput: validToolInput }]);
     const fetcher = fetcherWith({
       "https://example.com/s1.png": { mediaType: "image/png", base64: "AAA" },
       "https://example.com/s2.png": { mediaType: "image/png", base64: "BBB" },
@@ -146,9 +140,7 @@ describe("judgeAppVision", () => {
   });
 
   test("partial 404: 1 of 3 fails → continues with 2, screenshotsAnalyzed=2", async () => {
-    const { client, captured } = makeMockClient([
-      { kind: "ok", toolInput: validToolInput },
-    ]);
+    const { client, captured } = makeMockClient([{ kind: "ok", toolInput: validToolInput }]);
     const fetcher = fetcherWith({
       "https://example.com/s1.png": { mediaType: "image/png", base64: "AAA" },
       "https://example.com/s2.png": {
@@ -168,9 +160,7 @@ describe("judgeAppVision", () => {
   });
 
   test("returns err when ALL screenshots fail to fetch", async () => {
-    const { client } = makeMockClient([
-      { kind: "ok", toolInput: validToolInput },
-    ]);
+    const { client } = makeMockClient([{ kind: "ok", toolInput: validToolInput }]);
     const fetcher = fetcherWith({
       "https://example.com/s1.png": { error: new Error("net") },
       "https://example.com/s2.png": { error: new Error("net") },
@@ -185,9 +175,7 @@ describe("judgeAppVision", () => {
   });
 
   test("returns err when app has no screenshot URLs", async () => {
-    const { client } = makeMockClient([
-      { kind: "ok", toolInput: validToolInput },
-    ]);
+    const { client } = makeMockClient([{ kind: "ok", toolInput: validToolInput }]);
     const fetcher = fetcherWith({});
     const result = await judgeAppVision({
       app: { ...sampleApp, screenshotUrls: [] },
@@ -200,18 +188,10 @@ describe("judgeAppVision", () => {
   test("caps at maxScreenshots=5 default", async () => {
     const manyShots = {
       ...sampleApp,
-      screenshotUrls: Array.from(
-        { length: 10 },
-        (_, i) => `https://example.com/s${i}.png`,
-      ),
+      screenshotUrls: Array.from({ length: 10 }, (_, i) => `https://example.com/s${i}.png`),
     };
-    const { client, captured } = makeMockClient([
-      { kind: "ok", toolInput: validToolInput },
-    ]);
-    const fetchResults: Record<
-      string,
-      { mediaType: string; base64: string }
-    > = {};
+    const { client, captured } = makeMockClient([{ kind: "ok", toolInput: validToolInput }]);
+    const fetchResults: Record<string, { mediaType: string; base64: string }> = {};
     for (const u of manyShots.screenshotUrls) {
       fetchResults[u] = { mediaType: "image/png", base64: "X" };
     }
@@ -281,9 +261,7 @@ describe("judgeAppVision", () => {
   });
 
   test("rejects images larger than maxImageBytes (cost runaway guard)", async () => {
-    const { client } = makeMockClient([
-      { kind: "ok", toolInput: validToolInput },
-    ]);
+    const { client } = makeMockClient([{ kind: "ok", toolInput: validToolInput }]);
     const huge = "X".repeat(200);
     const fetcher = fetcherWith({
       "https://example.com/s1.png": { mediaType: "image/png", base64: "OK" },
@@ -302,15 +280,12 @@ describe("judgeAppVision", () => {
   });
 
   test("passes AbortSignal to fetcher (timeout contract)", async () => {
-    const { client } = makeMockClient([
-      { kind: "ok", toolInput: validToolInput },
-    ]);
+    const { client } = makeMockClient([{ kind: "ok", toolInput: validToolInput }]);
     let signalSeen: AbortSignal | undefined;
-    const fetcher: import("../../src/judges/vision-judge.ts").ImageFetcher =
-      async (_url, opts) => {
-        signalSeen = opts?.signal;
-        return { mediaType: "image/png", base64: "AAA" };
-      };
+    const fetcher: import("../../src/judges/vision-judge.ts").ImageFetcher = async (_url, opts) => {
+      signalSeen = opts?.signal;
+      return { mediaType: "image/png", base64: "AAA" };
+    };
     await judgeAppVision({
       app: { ...sampleApp, screenshotUrls: ["https://example.com/only.png"] },
       client,
@@ -321,16 +296,13 @@ describe("judgeAppVision", () => {
   });
 
   test("invokes onTokenUsage callback", async () => {
-    const { client } = makeMockClient([
-      { kind: "ok", toolInput: validToolInput },
-    ]);
+    const { client } = makeMockClient([{ kind: "ok", toolInput: validToolInput }]);
     const fetcher = fetcherWith({
       "https://example.com/s1.png": { mediaType: "image/png", base64: "A" },
       "https://example.com/s2.png": { mediaType: "image/png", base64: "B" },
       "https://example.com/s3.png": { mediaType: "image/png", base64: "C" },
     });
-    let captured: { input: number; output: number; model: string } | null =
-      null;
+    let captured: { input: number; output: number; model: string } | null = null;
     await judgeAppVision({
       app: sampleApp,
       client,

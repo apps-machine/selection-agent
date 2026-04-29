@@ -1,12 +1,14 @@
 import { describe, expect, test } from "bun:test";
-import { TokenBucket, RateLimiter } from "../../src/util/rate-limit.ts";
+import { RateLimiter, TokenBucket } from "../../src/util/rate-limit.ts";
 
 function makeFakeClock() {
   let now = 0;
   const sleeps: number[] = [];
   return {
     now: () => now,
-    advance: (ms: number) => { now += ms; },
+    advance: (ms: number) => {
+      now += ms;
+    },
     sleep: async (ms: number) => {
       sleeps.push(ms);
       now += ms;
@@ -108,9 +110,11 @@ describe("RateLimiter", () => {
 
   test("withLimit propagates errors from fn", async () => {
     const rl = new RateLimiter({ capacity: 1, refillPerSecond: 1 });
-    await expect(rl.withLimit("h", async () => {
-      throw new Error("boom");
-    })).rejects.toThrow("boom");
+    await expect(
+      rl.withLimit("h", async () => {
+        throw new Error("boom");
+      }),
+    ).rejects.toThrow("boom");
   });
 
   test("buckets per host are independent (drain apple does not affect google)", async () => {

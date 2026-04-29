@@ -1,15 +1,11 @@
 import { describe, expect, test } from "bun:test";
+import { mapToRawAppData } from "../../src/scrapers/api.ts";
 import {
   createGoogleScraperLib,
   type GoogleScraperLib,
 } from "../../src/scrapers/google-play-client.ts";
-import { mapToRawAppData } from "../../src/scrapers/api.ts";
-import grossingFixture from "../fixtures/google-grossing-br.json" with {
-  type: "json",
-};
-import appDetailFixture from "../fixtures/google-app-detail.json" with {
-  type: "json",
-};
+import appDetailFixture from "../fixtures/google-app-detail.json" with { type: "json" };
+import grossingFixture from "../fixtures/google-grossing-br.json" with { type: "json" };
 
 function makeMock(overrides: Partial<GoogleScraperLib> = {}): GoogleScraperLib {
   return {

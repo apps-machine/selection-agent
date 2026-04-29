@@ -30,10 +30,7 @@ export async function mapWithConcurrency<I, O>(
     }
   }
 
-  const workers = Array.from(
-    { length: Math.min(concurrency, inputs.length) },
-    worker,
-  );
+  const workers = Array.from({ length: Math.min(concurrency, inputs.length) }, worker);
   await Promise.all(workers);
 
   const successes: O[] = [];

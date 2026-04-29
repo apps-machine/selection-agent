@@ -18,9 +18,7 @@ export function assertDiskSpace(path: string, minBytes: number): void {
   if (freeBytes < minBytes) {
     const freeMb = Math.floor(freeBytes / 1024 / 1024);
     const minMb = Math.floor(minBytes / 1024 / 1024);
-    throw new Error(
-      `disk space too low: ${freeMb}MB free, need at least ${minMb}MB at ${path}`,
-    );
+    throw new Error(`disk space too low: ${freeMb}MB free, need at least ${minMb}MB at ${path}`);
   }
 }
 

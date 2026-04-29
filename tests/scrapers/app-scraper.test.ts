@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { Cache } from "../../src/storage/cache.ts";
-import { scrapeApps } from "../../src/scrapers/app-scraper.ts";
 import type { AppDetails, ScraperLib } from "../../src/scrapers/api.ts";
+import { scrapeApps } from "../../src/scrapers/app-scraper.ts";
+import { Cache } from "../../src/storage/cache.ts";
 
 function makeStub(detailsByAppId: Record<string, AppDetails>): ScraperLib {
   return {

@@ -23,7 +23,7 @@ interface DemoSnapshot {
 export async function runDemo(opts: { format: "markdown" | "json" }): Promise<void> {
   const data = snapshot as DemoSnapshot;
   if (opts.format === "json") {
-    process.stdout.write(JSON.stringify(data, null, 2) + "\n");
+    process.stdout.write(`${JSON.stringify(data, null, 2)}\n`);
     return;
   }
   process.stdout.write(renderMarkdownBrief(data));
@@ -34,7 +34,9 @@ function renderMarkdownBrief(data: DemoSnapshot): string {
   lines.push(`# Selection Agent — Demo Brief`);
   lines.push(``);
   lines.push(`> Cached snapshot generated ${data.generatedAt}.`);
-  lines.push(`> ${data.candidatesEvaluated} candidates evaluated across ${data.marketsScanned} markets.`);
+  lines.push(
+    `> ${data.candidatesEvaluated} candidates evaluated across ${data.marketsScanned} markets.`,
+  );
   lines.push(``);
   lines.push(`## Top ${data.topCandidates.length} candidates`);
   lines.push(``);

@@ -2,8 +2,8 @@ import { Database } from "bun:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import type { ZodType } from "zod";
-import { ALL_SCHEMAS } from "./schema.ts";
 import { assertDiskSpace, MIN_DISK_BYTES_DEFAULT } from "./disk.ts";
+import { ALL_SCHEMAS } from "./schema.ts";
 
 function ensureParentDir(path: string): void {
   mkdirSync(dirname(path), { recursive: true });
@@ -21,17 +21,11 @@ export class Cache {
     private readonly clock: () => number,
   ) {}
 
-  static open(
-    path: string,
-    opts: { clock?: () => number; minFreeBytes?: number } = {},
-  ): Cache {
+  static open(path: string, opts: { clock?: () => number; minFreeBytes?: number } = {}): Cache {
     const clock = opts.clock ?? Date.now;
     if (path !== ":memory:") {
       ensureParentDir(path);
-      assertDiskSpace(
-        dirname(path),
-        opts.minFreeBytes ?? MIN_DISK_BYTES_DEFAULT,
-      );
+      assertDiskSpace(dirname(path), opts.minFreeBytes ?? MIN_DISK_BYTES_DEFAULT);
     }
     const db = new Database(path, { create: true, strict: true });
     db.exec("PRAGMA journal_mode = WAL");
@@ -67,10 +61,13 @@ export class Cache {
   get<T>(key: string, schema?: ZodType<T>): T | null {
     const now = this.clock();
     const row = this.db
-      .prepare<{
-        payload: string;
-        expires_at: number;
-      }, { key: string; now: number }>(
+      .prepare<
+        {
+          payload: string;
+          expires_at: number;
+        },
+        { key: string; now: number }
+      >(
         `SELECT payload, expires_at
          FROM scrape_cache
          WHERE cache_key = $key AND expires_at > $now`,
@@ -80,11 +77,7 @@ export class Cache {
     return this.parsePayload<T>(key, row.payload, schema);
   }
 
-  private parsePayload<T>(
-    key: string,
-    payload: string,
-    schema?: ZodType<T>,
-  ): T | null {
+  private parsePayload<T>(key: string, payload: string, schema?: ZodType<T>): T | null {
     let parsed: unknown;
     try {
       parsed = JSON.parse(payload);
@@ -102,18 +95,20 @@ export class Cache {
   }
 
   delete(key: string): void {
-    this.db.prepare("DELETE FROM scrape_cache WHERE cache_key = $key")
-      .run({ key });
+    this.db.prepare("DELETE FROM scrape_cache WHERE cache_key = $key").run({ key });
   }
 
   getEntry<T>(key: string, schema?: ZodType<T>): CacheEntry<T> | null {
     const now = this.clock();
     const row = this.db
-      .prepare<{
-        payload: string;
-        expires_at: number;
-        created_at: number;
-      }, { key: string; now: number }>(
+      .prepare<
+        {
+          payload: string;
+          expires_at: number;
+          created_at: number;
+        },
+        { key: string; now: number }
+      >(
         `SELECT payload, expires_at, created_at
          FROM scrape_cache
          WHERE cache_key = $key AND expires_at > $now`,
@@ -132,11 +127,14 @@ export class Cache {
   /** Returns the entry even if expired — useful for stale-fallback on scrape failure. */
   getStale<T>(key: string, schema?: ZodType<T>): CacheEntry<T> | null {
     const row = this.db
-      .prepare<{
-        payload: string;
-        expires_at: number;
-        created_at: number;
-      }, { key: string }>(
+      .prepare<
+        {
+          payload: string;
+          expires_at: number;
+          created_at: number;
+        },
+        { key: string }
+      >(
         `SELECT payload, expires_at, created_at
          FROM scrape_cache
          WHERE cache_key = $key`,

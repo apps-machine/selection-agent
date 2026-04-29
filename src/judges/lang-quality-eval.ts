@@ -1,15 +1,15 @@
 import { z } from "zod";
-import { type Result, err, ok } from "../util/result.ts";
+import { err, ok, type Result } from "../util/result.ts";
 import {
-  type RetryOptions,
   isFatalHttpError,
   isTransientHttpError,
+  type RetryOptions,
   retryWithBackoff,
 } from "../util/retry.ts";
 import {
   LANG_QUALITY_PASS_THRESHOLD,
-  LangQualityResultSchema,
   type LangQualityResult,
+  LangQualityResultSchema,
 } from "./schemas.ts";
 
 export const DEFAULT_LANG_QUALITY_MODEL = "claude-sonnet-4-6";
@@ -143,9 +143,7 @@ async function callTool(
     model: opts.model ?? DEFAULT_LANG_QUALITY_MODEL,
     max_tokens: 4096,
     messages: [{ role: "user", content: prompt }],
-    tools: [
-      { name: toolName, description: toolDescription, input_schema: toolSchema },
-    ],
+    tools: [{ name: toolName, description: toolDescription, input_schema: toolSchema }],
     tool_choice: { type: "tool", name: toolName },
   };
   return retryWithBackoff(() => opts.client.messages.create(params), {
@@ -197,9 +195,7 @@ export async function evaluateLanguageQuality(
   if (t1 === null) return err(new Error("lang-quality: no translate tool_use"));
   const translations = TranslationsResponse.safeParse(t1);
   if (!translations.success) {
-    return err(
-      new Error(`lang-quality: translations invalid: ${translations.error.message}`),
-    );
+    return err(new Error(`lang-quality: translations invalid: ${translations.error.message}`));
   }
   if (translations.data.translations.length !== opts.phrases.length) {
     return err(
@@ -236,9 +232,7 @@ export async function evaluateLanguageQuality(
   }
   const backs = BackTranslationsResponse.safeParse(t2);
   if (!backs.success) {
-    return err(
-      new Error(`lang-quality: back-translations invalid: ${backs.error.message}`),
-    );
+    return err(new Error(`lang-quality: back-translations invalid: ${backs.error.message}`));
   }
   if (backs.data.backTranslations.length !== opts.phrases.length) {
     return err(
@@ -251,8 +245,7 @@ export async function evaluateLanguageQuality(
   // Step 3: score equivalence (original EN vs back-translated EN)
   const pairs = opts.phrases
     .map(
-      (p, i) =>
-        `${i + 1}. ORIGINAL: ${p}\n   BACK-TRANSLATED: ${backs.data.backTranslations[i]}`,
+      (p, i) => `${i + 1}. ORIGINAL: ${p}\n   BACK-TRANSLATED: ${backs.data.backTranslations[i]}`,
     )
     .join("\n");
   let resp3: AnthropicMessage;
@@ -276,9 +269,7 @@ export async function evaluateLanguageQuality(
   if (t3 === null) return err(new Error("lang-quality: no score tool_use"));
   const scoresParsed = ScoresResponse.safeParse(t3);
   if (!scoresParsed.success) {
-    return err(
-      new Error(`lang-quality: scores invalid: ${scoresParsed.error.message}`),
-    );
+    return err(new Error(`lang-quality: scores invalid: ${scoresParsed.error.message}`));
   }
   if (scoresParsed.data.scores.length !== opts.phrases.length) {
     return err(
@@ -295,8 +286,7 @@ export async function evaluateLanguageQuality(
     equivalenceScore: scoresParsed.data.scores[i]?.score ?? 0,
   }));
   const meanScore =
-    perPhraseResults.reduce((sum, r) => sum + r.equivalenceScore, 0) /
-    perPhraseResults.length;
+    perPhraseResults.reduce((sum, r) => sum + r.equivalenceScore, 0) / perPhraseResults.length;
   const passes = meanScore >= LANG_QUALITY_PASS_THRESHOLD;
 
   const candidate = {
@@ -311,11 +301,7 @@ export async function evaluateLanguageQuality(
   };
   const parsed = LangQualityResultSchema.safeParse(candidate);
   if (!parsed.success) {
-    return err(
-      new Error(
-        `lang-quality: result schema invalid: ${parsed.error.message}`,
-      ),
-    );
+    return err(new Error(`lang-quality: result schema invalid: ${parsed.error.message}`));
   }
   return ok(parsed.data);
 }

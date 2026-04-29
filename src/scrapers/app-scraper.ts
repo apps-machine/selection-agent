@@ -1,8 +1,8 @@
-import { Cache } from "../storage/cache.ts";
+import type { Cache } from "../storage/cache.ts";
 import type { RawAppData, Store } from "../types/raw-app-data.ts";
 import { mapWithConcurrency } from "../util/concurrent.ts";
 import type { RateLimiter } from "../util/rate-limit.ts";
-import { resilient, type ResilientCache } from "../util/resilient.ts";
+import { type ResilientCache, resilient } from "../util/resilient.ts";
 import type { AppDetails, ScraperLib } from "./api.ts";
 import { mapToRawAppData } from "./api.ts";
 
@@ -21,11 +21,7 @@ export interface AppScrapeOptions {
   fallbacks?: { apple?: ScraperLib; google?: ScraperLib };
   /** Optional global rate limiter (shared with chart-scraper / review-scraper). */
   rateLimiter?: RateLimiter;
-  logger?: (
-    level: "info" | "warn" | "error",
-    msg: string,
-    ctx?: Record<string, unknown>,
-  ) => void;
+  logger?: (level: "info" | "warn" | "error", msg: string, ctx?: Record<string, unknown>) => void;
   scrapedAt?: () => string;
 }
 
@@ -38,19 +34,10 @@ export interface AppScrapeOutcome {
 import { buildCacheKey } from "../storage/cache-key.ts";
 
 function appCacheKey(job: AppScrapeJob): string {
-  return buildCacheKey(
-    "app",
-    job.store,
-    job.market.toLowerCase(),
-    job.appId,
-  );
+  return buildCacheKey("app", job.store, job.market.toLowerCase(), job.appId);
 }
 
-function cacheAdapter(
-  cache: Cache,
-  key: string,
-  ttlSeconds: number,
-): ResilientCache<AppDetails> {
+function cacheAdapter(cache: Cache, key: string, ttlSeconds: number): ResilientCache<AppDetails> {
   return {
     get: () => cache.get<AppDetails>(key),
     getStale: () => {
