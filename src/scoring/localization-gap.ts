@@ -45,7 +45,7 @@ const MARKET_TO_LANG: Readonly<Record<string, LangCode>> = Object.freeze({
 
 // Stop word sets — chosen to maximize disambiguation across Latin-script langs.
 const STOP_WORDS: Readonly<Record<string, readonly string[]>> = Object.freeze({
-  en: ["the", "and", "you", "your", "with", "this", "that", "for", "are", "is", "have", "of", "to", "a", "an"],
+  en: ["the", "and", "you", "your", "with", "this", "that", "for", "are", "is", "have", "of", "to", "a", "an", "or", "if", "can", "be", "by", "in", "on", "at", "we"],
   fr: ["le", "la", "les", "et", "est", "vous", "pour", "avec", "votre", "des", "une", "dans", "ce", "sont", "ou", "du", "au"],
   de: ["der", "die", "das", "und", "ist", "sie", "für", "mit", "ihre", "ein", "eine", "einem", "einer", "dem", "den", "zum", "zur", "deine", "deinen"],
   es: ["el", "los", "las", "y", "es", "con", "su", "este", "esta", "una", "un", "tus", "sus", "que"],
