@@ -1,6 +1,7 @@
 import { Cache } from "../storage/cache.ts";
 import type { RawAppData, Store } from "../types/raw-app-data.ts";
 import { mapWithConcurrency } from "../util/concurrent.ts";
+import type { RateLimiter } from "../util/rate-limit.ts";
 import { resilient, type ResilientCache } from "../util/resilient.ts";
 import type { AppDetails, ScraperLib } from "./api.ts";
 import { mapToRawAppData } from "./api.ts";
@@ -18,6 +19,8 @@ export interface AppScrapeOptions {
   clients: { apple: ScraperLib; google: ScraperLib };
   concurrency?: number;
   fallbacks?: { apple?: ScraperLib; google?: ScraperLib };
+  /** Optional global rate limiter (shared with chart-scraper / review-scraper). */
+  rateLimiter?: RateLimiter;
   logger?: (
     level: "info" | "warn" | "error",
     msg: string,
@@ -58,6 +61,15 @@ function cacheAdapter(
   };
 }
 
+function rateLimited<T>(
+  rl: RateLimiter | undefined,
+  host: string,
+  fn: () => Promise<T>,
+): () => Promise<T> {
+  if (!rl) return fn;
+  return () => rl.withLimit(host, fn);
+}
+
 export async function scrapeApps(
   jobs: readonly AppScrapeJob[],
   opts: AppScrapeOptions,
@@ -72,21 +84,24 @@ export async function scrapeApps(
     const client = opts.clients[job.store];
     const fallback = opts.fallbacks?.[job.store];
     const adapter = cacheAdapter(opts.cache, appCacheKey(job), opts.cacheTtlSeconds);
+    const host = job.store;
     const out = await resilient<AppDetails>(
       {
-        primary: () =>
+        primary: rateLimited(opts.rateLimiter, host, () =>
           client.fetchApp({
             store: job.store,
             market: job.market,
             appId: job.appId,
           }),
+        ),
         fallback: fallback
-          ? () =>
+          ? rateLimited(opts.rateLimiter, host, () =>
               fallback.fetchApp({
                 store: job.store,
                 market: job.market,
                 appId: job.appId,
-              })
+              }),
+            )
           : undefined,
         cache: adapter,
       },
