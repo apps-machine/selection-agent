@@ -1,5 +1,6 @@
 import { Cache } from "../storage/cache.ts";
 import type { Store } from "../types/raw-app-data.ts";
+import type { RateLimiter } from "../util/rate-limit.ts";
 import { resilient, type ResilientCache } from "../util/resilient.ts";
 
 export interface ReviewSnippet {
@@ -77,11 +78,22 @@ export interface ReviewScrapeOptions {
   cacheTtlSeconds: number;
   client: ReviewScraperLib;
   fallback?: ReviewScraperLib;
+  /** Optional global rate limiter (shared with chart-scraper / app-scraper). */
+  rateLimiter?: RateLimiter;
   logger?: (
     level: "info" | "warn" | "error",
     msg: string,
     ctx?: Record<string, unknown>,
   ) => void;
+}
+
+function rateLimited<T>(
+  rl: RateLimiter | undefined,
+  host: string,
+  fn: () => Promise<T>,
+): () => Promise<T> {
+  if (!rl) return fn;
+  return () => rl.withLimit(host, fn);
 }
 
 export async function scrapeReviewPage(
@@ -102,11 +114,13 @@ export async function scrapeReviewPage(
   };
   const out = await resilient<unknown[]>(
     {
-      primary: () =>
+      primary: rateLimited(opts.rateLimiter, store, () =>
         opts.client.fetchReviews({ store, market, appId, page }),
+      ),
       fallback: opts.fallback
-        ? () =>
-            opts.fallback!.fetchReviews({ store, market, appId, page })
+        ? rateLimited(opts.rateLimiter, store, () =>
+            opts.fallback!.fetchReviews({ store, market, appId, page }),
+          )
         : undefined,
       cache,
     },
