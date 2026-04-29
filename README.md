@@ -38,7 +38,7 @@ Requires [Bun](https://bun.sh) ≥ 1.0.
 ```bash
 selection-agent demo                       # cached snapshot, no API key — works today
 selection-agent scan                        # live dual-store scan (M2-M6, needs ANTHROPIC_API_KEY)
-selection-agent scan --no-llm               # heuristics only (M3)
+selection-agent scan --no-llm               # heuristics only (M3 — heuristic scorers shipped)
 selection-agent scan --top 50               # limit candidates (M2)
 selection-agent scan --format json          # JSON output (M2)
 selection-agent snapshot                    # daily Track B writer (M5)
@@ -81,15 +81,15 @@ Pre-commit: `git config core.hooksPath .githooks` (runs `gitleaks` if installed)
 
 Phase 0 ships incrementally:
 
-| Milestone | Scope |
-|---|---|
-| M1 | Multi-repo open core scaffolding (this commit) |
-| M2 | Dual-OS dual-store scrapers + 3-tier resilience |
-| M3 | Heuristic scoring (loc gap, paywall, revenue, composite) |
-| M4 | Claude judges (text + vision) + lang quality eval |
-| M5 | Velocity scaffolding (Track B time-series) |
-| M6 | Demo dataset + orchestrator + reporting |
-| M7 | citty CLI polish + tests + eval baselines |
+| Milestone | Scope | Status |
+|---|---|---|
+| M1 | Multi-repo open core scaffolding | shipped (v0.1.0) |
+| M2 | Dual-OS dual-store scrapers + 3-tier resilience | shipped (v0.1.0) |
+| M3 | Heuristic scoring (loc gap, paywall, revenue, composite) + token-bucket rate limiter + Playwright Apple fallback | shipped (v0.2.0) |
+| M4 | Claude judges (text + vision) + lang quality eval | upcoming |
+| M5 | Velocity scaffolding (Track B time-series) | upcoming |
+| M6 | Demo dataset + orchestrator + reporting | upcoming |
+| M7 | citty CLI polish + tests + eval baselines + npm publish | upcoming |
 
 ## Architecture
 
