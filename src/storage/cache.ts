@@ -3,6 +3,7 @@ import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import type { ZodType } from "zod";
 import { assertDiskSpace, MIN_DISK_BYTES_DEFAULT } from "./disk.ts";
+import { SnapshotStore } from "./queries.ts";
 import { ALL_SCHEMAS } from "./schema.ts";
 
 function ensureParentDir(path: string): void {
@@ -167,5 +168,15 @@ export class Cache {
 
   close(): void {
     this.db.close();
+  }
+
+  /**
+   * Returns a `SnapshotStore` bound to this Cache's underlying SQLite
+   * connection. The velocity layer uses this to read/write the
+   * `app_snapshot` table without opening a second connection (which
+   * would defeat WAL coordination and double the schema-apply cost).
+   */
+  snapshotStore(): SnapshotStore {
+    return new SnapshotStore(this.db);
   }
 }

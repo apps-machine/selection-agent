@@ -1,6 +1,6 @@
 {
   "name": "@apps-machine/selection-agent",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Apps Machine — Selection Agent. Ranks app opportunities globally via dual-store (Apple App Store + Google Play) scraping, heuristic scoring, and Claude judges. Run `npx @apps-machine/selection-agent demo` for a 30s magical moment.",
   "type": "module",
   "bin": {

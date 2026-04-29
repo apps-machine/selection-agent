@@ -5,21 +5,35 @@ All notable changes to `@apps-machine/selection-agent` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.4.0] - 2026-04-29
 
-M5 ↔ M6 interface freeze. Locks the contract between velocity scaffolding (M5) and orchestrator + reporting (M6) so both can be built in parallel worktrees without signature drift.
+M5 — velocity scaffolding. Track B (first-mover detection) starts accumulating snapshots immediately and produces a usable score from J14 onward. Until then, `getVelocityScore` returns `null` and the composite scorer flips to `WEIGHTS_NO_VELOCITY` (already wired since M3).
 
 ### Added
 
-- **`src/velocity/types.ts`** — `SnapshotPayloadSchema` (Zod) and `VelocityScoreInput`. The payload shape M5 will write into the pre-existing `app_snapshot` table (`raw: RawAppData`, `rankOfDay: int | null`). Single boundary; M5 can evolve the payload behind one Zod parse without DB migrations.
-- **`src/velocity/snapshot.ts`** — `writeSnapshot({ apps, cache, snapshotDay?, rankByKey? })` signature returning `{ written, skipped, day }`. Stub throws `M5 not implemented`. Idempotent semantics guaranteed by `app_snapshot` UNIQUE constraint when M5 fills it in.
-- **`src/velocity/delta.ts`** — `getVelocityScore({ store, appId, market, cache, asOf?, baselineDays? })` signature returning `number | null`. Stub returns `null`, which is semantically valid (means "not enough baseline yet") and lets M6 develop against `WEIGHTS_NO_VELOCITY` path without M5 being done.
+- **`src/velocity/snapshot.ts`** — `writeSnapshot({ apps, cache, snapshotDay?, rankByKey?, now? })` real implementation. Validates each payload via `SnapshotPayloadSchema` before insert (a malformed `RawAppData` raises before SQLite ever sees it). Uses `INSERT … ON CONFLICT DO NOTHING` against the `app_snapshot` UNIQUE `(store, app_id, market, snapshot_day)` constraint and reports `{ written, skipped, day }`. UTC `YYYY-MM-DD` snapshot day so cron rollover is timezone-stable.
+- **`src/velocity/delta.ts`** — `getVelocityScore({ store, appId, market, cache, asOf?, baselineDays? })` real implementation. Delta-based, computed on the fly — no materialised table. Reads `[asOf - baselineDays + 1, asOf]` rows for the app, runs each through `SnapshotPayloadSchema.safeParse`, and pino-`debug`s any corrupt row before discarding it (the critical observability gap — without this, a single bad row would silently mask the velocity signal). Returns `null` when valid rows < `baselineDays`, otherwise `0.6 * rankScore + 0.4 * ratingsScore` clamped 0-10. `baselineDays` defaults to 14 (J14 activation).
+- **`src/velocity/run-snapshot.ts`** — orchestrator behind the new CLI subcommand. Scrapes `top-grossing` for the 6 Phase 0 markets (US, JP, DE, FR, BR, ES) on both stores in one pass, builds `rankByKey` from chart-scraper rank, calls `writeSnapshot`, and reports failed market jobs without aborting the rest. Cron-friendly: scrape-only, no LLM judges.
+- **`src/storage/queries.ts`** — `SnapshotStore` class wrapping the same SQLite connection as `Cache`. Exposed via `cache.snapshotStore()` so the velocity layer never opens a second connection (would defeat WAL coordination and double the schema-apply cost). Just two methods: `insertSnapshot` (returns `true` if inserted, `false` if conflict-ignored) and `selectSnapshotRange` (single-app range read, ordered ASC).
+- **CLI `selection-agent snapshot`** — replaces the M5-stub `NOT_IMPLEMENTED` error. New flags: `--limit` (apps per market+store, default 100) and `--db` (SQLite path, defaults to `$SELECTION_AGENT_DB` or `./.cache/selection-agent.sqlite`). Prints `Snapshot written for {day}: {written} new, {skipped} already present.` and exits 0 on success. Failed chart jobs are reported on stderr but don't fail the run (other markets still write).
+- **`tests/velocity/fixtures.ts`** — `seedSnapshotHistory` test helper. Linearly interpolates `rankOfDay` from `startRank` (oldest) to `endRank` (most recent) across `days` consecutive UTC days; ratings climb by `ratingsPerDay`. Used by both M5 tests and (forward) M6 pipeline tests so the snapshot history fixture is one source of truth across the freeze line.
+
+### Changed
+
+- `src/storage/cache.ts` — `Cache` now exposes `snapshotStore()` returning a `SnapshotStore` bound to its underlying connection. Internal change; existing `Cache` API is unchanged.
+
+### Tests
+
+- **`tests/velocity/snapshot.test.ts`** — empty-cache writes, idempotency on re-write, `snapshotDay` override, default-day shape (`YYYY-MM-DD` UTC), Zod-rejection of malformed `RawAppData`, missing/present `rankByKey` mapping into `rankOfDay`, partial-conflict accounting.
+- **`tests/velocity/delta.test.ts`** — history < baseline → null; monotonic climb → > 5; flat history → 0 (defined, not null); rank-drop clamps to 0; corrupt JSON drops below baseline → null; corrupt row at unrelated `appId` doesn't bleed; custom `baselineDays`; `asOf` time-pinning; gap (delisted) → null; rank-only signal (ratings null) still computes; `baselineDays <= 0` throws.
+- **`tests/velocity/fixtures.test.ts`** — sanity check that `seedSnapshotHistory` produces the rows it claims (consecutive UTC days, linear rank interpolation, ratings climb, null-preservation, multi-app independence).
+- **`tests/velocity/run-snapshot.test.ts`** — CLI smoke. Mocked clients across `markets × stores` produce the expected row count, idempotent re-runs, `rankOfDay` populated from chart-scraper rank, failing client surfaces as a `failedMarkets` entry without aborting.
 
 ### Notes
 
-- No version bump. Freeze stubs are not new public-API exports (no barrel; `bin` still points at `cli/index.ts` only). M5 lands the real impl as `0.4.0` (MINOR), M6 lands as `0.5.0` (MINOR).
-- No schema migration. `app_snapshot` table already exists from M2 era; M5 just standardises the `payload` JSON shape via `SnapshotPayloadSchema`.
-- Contract details and merge strategy live at `.context/m5-m6-contract.md` (gitignored workspace scratchpad — see that file for the full M5/M6 ownership matrix, conflict points, and edge-case handling).
+- No schema migration. `app_snapshot` table already exists from M2 era; M5 standardises the `payload` JSON shape via `SnapshotPayloadSchema` and writes the first real rows.
+- `src/velocity/**` and `src/storage/queries.ts` removed from the `knip.json` ignore list now that they have real implementations + tests.
+- Contract details (M5/M6 ownership matrix, conflict points, edge-case handling) live at `.context/m5-m6-contract.md`.
 
 ## [0.3.0] - 2026-04-29
 
@@ -168,5 +182,6 @@ M4 — LLM judges + lang quality eval. Selection Agent can now grade the localiz
   `permissions` + pinned `bun-version: 1.3.x`, `.env.example` documenting
   `ANTHROPIC_API_KEY` and model overrides.
 
+[0.4.0]: https://github.com/apps-machine/selection-agent/compare/v0.3.0...v0.4.0
 [0.1.0]: https://github.com/apps-machine/selection-agent/compare/v0.0.1...v0.1.0
 [0.0.1]: https://github.com/apps-machine/selection-agent/releases/tag/v0.0.1

@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 import { defineCommand, runMain } from "citty";
 import { runDemo } from "../demo/run-demo.ts";
+import { runSnapshot } from "../velocity/run-snapshot.ts";
 import { formatError } from "./errors.ts";
 
 const main = defineCommand({
@@ -80,20 +81,64 @@ const main = defineCommand({
     snapshot: defineCommand({
       meta: {
         name: "snapshot",
-        description: "Daily Track B snapshot writer (velocity scaffolding, activates J14).",
+        description:
+          "Daily Track B snapshot writer. Scrapes top-grossing across the 6 Phase 0 markets on both stores and persists one row per app per UTC day. Cron-friendly: scrape-only, no LLM calls.",
       },
-      async run() {
-        console.error(
-          formatError({
-            code: "NOT_IMPLEMENTED",
-            message: "snapshot command lands in milestone M5",
-            cause:
-              "Track B velocity scaffolding requires daily snapshots accumulated over 14 days.",
-            fix: "Wait for M5, or run `selection-agent demo` for Track A preview.",
-            docs: "https://github.com/apps-machine/selection-agent#milestones",
-          }),
-        );
-        process.exit(2);
+      args: {
+        limit: {
+          type: "string",
+          description: "Apps to capture per market+store",
+          default: "100",
+        },
+        db: {
+          type: "string",
+          description:
+            "SQLite DB path (overrides $SELECTION_AGENT_DB; defaults to ./.cache/selection-agent.sqlite)",
+        },
+      },
+      async run({ args }) {
+        const rawLimit = typeof args.limit === "string" ? args.limit : "100";
+        const limit = Number.parseInt(rawLimit, 10);
+        if (!Number.isFinite(limit) || limit <= 0) {
+          console.error(
+            formatError({
+              code: "INVALID_LIMIT",
+              message: `--limit must be a positive integer, got "${rawLimit}"`,
+              cause: "Each chart is fetched up to --limit entries per market+store.",
+              fix: "rerun with --limit 100 (default) or another positive integer",
+              docs: "https://github.com/apps-machine/selection-agent#commands",
+            }),
+          );
+          process.exit(2);
+        }
+        const dbPath =
+          (typeof args.db === "string" && args.db) ||
+          process.env.SELECTION_AGENT_DB ||
+          "./.cache/selection-agent.sqlite";
+        try {
+          const result = await runSnapshot({ dbPath, limit });
+          process.stdout.write(
+            `Snapshot written for ${result.day}: ${result.written} new, ${result.skipped} already present.\n`,
+          );
+          if (result.failures > 0) {
+            process.stderr.write(
+              `Note: ${result.failures} chart job(s) failed (markets: ${result.failedMarkets.join(", ")}).\n`,
+            );
+          }
+          process.exit(0);
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          console.error(
+            formatError({
+              code: "SNAPSHOT_FAILED",
+              message,
+              cause: "Snapshot writer failed before any rows were written.",
+              fix: "Check network access, then rerun. Use --db to point at an alternate cache path.",
+              docs: "https://github.com/apps-machine/selection-agent#commands",
+            }),
+          );
+          process.exit(1);
+        }
       },
     }),
     report: defineCommand({
