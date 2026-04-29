@@ -21,10 +21,14 @@ const LOG_RANGE = LOG_MAX - LOG_BASELINE;
 
 export function scoreRevenue(input: RevenueScoreInput): number {
   const { rating, ratingsCount, market } = input;
-  if (rating === null || ratingsCount === null || ratingsCount <= 0) return 0;
+  if (rating === null || ratingsCount === null) return 0;
+  // Defensive: scrapers may return NaN for new apps with no signal yet. Without
+  // this guard, NaN propagates through composite and corrupts the entire ranking.
+  if (!Number.isFinite(rating) || !Number.isFinite(ratingsCount)) return 0;
+  if (ratingsCount <= 0) return 0;
 
   const signal = rating * ratingsCount * arpuForMarket(market);
-  if (signal <= 0) return 0;
+  if (!Number.isFinite(signal) || signal <= 0) return 0;
 
   const logSignal = Math.log10(signal + 1);
   const raw = ((logSignal - LOG_BASELINE) / LOG_RANGE) * 10;

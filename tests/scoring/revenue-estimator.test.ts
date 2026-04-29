@@ -54,3 +54,17 @@ describe("scoreRevenue", () => {
     expect(upper).toBe(lower);
   });
 });
+
+describe("scoreRevenue — regression: NaN/Infinity guards", () => {
+  test("returns 0 when rating is NaN", () => {
+    expect(scoreRevenue({ rating: NaN, ratingsCount: 10000, market: "us" })).toBe(0);
+  });
+
+  test("returns 0 when ratingsCount is NaN", () => {
+    expect(scoreRevenue({ rating: 4.5, ratingsCount: NaN, market: "us" })).toBe(0);
+  });
+
+  test("returns 0 when rating is Infinity", () => {
+    expect(scoreRevenue({ rating: Infinity, ratingsCount: 1000, market: "us" })).toBe(0);
+  });
+});

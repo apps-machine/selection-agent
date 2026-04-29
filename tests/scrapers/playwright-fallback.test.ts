@@ -207,3 +207,56 @@ describe("createPlaywrightAppleFallback", () => {
     expect(fake.page.visited[0]).toContain("/us/charts/");
   });
 });
+
+describe("parseAppHtml — regression: multiple JSON-LD blocks", () => {
+  test("finds MobileApplication when it is not the first JSON-LD block", () => {
+    const html = `<html><head>
+<script type="application/ld+json">
+{ "@type": "BreadcrumbList", "itemListElement": [] }
+</script>
+<script type="application/ld+json">
+{ "@type": "Product", "name": "Some Product" }
+</script>
+<script type="application/ld+json">
+{
+  "@type": "MobileApplication",
+  "name": "Cal AI",
+  "url": "https://apps.apple.com/us/app/cal-ai/id6480417616",
+  "author": { "name": "Cal AI Inc." }
+}
+</script>
+</head><body></body></html>`;
+    const out = parseAppHtml(html);
+    expect(out).not.toBeNull();
+    expect(out!.title).toBe("Cal AI");
+    expect(out!.appId).toBe("6480417616");
+  });
+
+  test("skips malformed JSON-LD block and continues to next", () => {
+    const html = `<html><head>
+<script type="application/ld+json">{ this is not json</script>
+<script type="application/ld+json">
+{
+  "@type": "MobileApplication",
+  "name": "Cal AI",
+  "url": "https://apps.apple.com/us/app/cal-ai/id6480417616"
+}
+</script>
+</head></html>`;
+    const out = parseAppHtml(html);
+    expect(out).not.toBeNull();
+    expect(out!.title).toBe("Cal AI");
+  });
+});
+
+describe("parseChartHtml — regression: accented slugs", () => {
+  test("extracts appIds from links with accented or non-ASCII slugs", () => {
+    const html = `<html><body>
+<a href="/us/app/wetransfer-envíos/id1485284428">WeTransfer</a>
+<a href="/jp/app/カロリー計算/id1234567890">JP App</a>
+<a href="/fr/app/déjà-vu/id9999999999">FR App</a>
+</body></html>`;
+    const ids = parseChartHtml(html).map((e) => e.appId).sort();
+    expect(ids).toEqual(["1234567890", "1485284428", "9999999999"]);
+  });
+});

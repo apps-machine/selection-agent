@@ -73,3 +73,32 @@ describe("scoreLocalizationGap", () => {
     expect(s).toBeLessThanOrEqual(10);
   });
 });
+
+describe("scoreLocalizationGap — regression: extended Latin scripts", () => {
+  test("Polish description in PL market scores 0", () => {
+    const PL = "Najlepsza aplikacja do liczenia kalorii. Śledź swoje posiłki, łącz się ze znajomymi i osiągaj swoje cele.";
+    expect(scoreLocalizationGap({ description: PL, market: "pl" })).toBe(0);
+  });
+
+  test("Turkish description in TR market scores 0", () => {
+    const TR = "Kalori saymak için en iyi uygulama. Yemeklerinizi takip edin ve hedeflerinize daha çok yaklaşın.";
+    expect(scoreLocalizationGap({ description: TR, market: "tr" })).toBe(0);
+  });
+
+  test("Polish description in DE market scores 10 (mismatch)", () => {
+    const PL = "Najlepsza aplikacja do liczenia kalorii. Śledź swoje posiłki i osiągaj swoje cele.";
+    expect(scoreLocalizationGap({ description: PL, market: "de" })).toBe(10);
+  });
+});
+
+describe("scoreLocalizationGap — regression: multi-language markets", () => {
+  test("Switzerland market returns neutral (5) regardless of description", () => {
+    const FR = "La meilleure application pour compter les calories. Suivez vos repas et atteignez vos objectifs.";
+    expect(scoreLocalizationGap({ description: FR, market: "ch" })).toBe(5);
+  });
+
+  test("Belgium market returns neutral (5) regardless of description", () => {
+    const FR = "La meilleure application pour compter les calories. Suivez vos repas et atteignez vos objectifs.";
+    expect(scoreLocalizationGap({ description: FR, market: "be" })).toBe(5);
+  });
+});
