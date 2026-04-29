@@ -1,0 +1,277 @@
+{
+  "version": 1,
+  "comment": "10 text-judge eval cases drawn from real apps + synthetic patterns. Expected scores are ranges, not exact values. Schema mirrors RawAppData with appended expectation block.",
+  "cases": [
+    {
+      "id": "cal-ai-br",
+      "label": "Cal AI in BR (15-lang localized)",
+      "app": {
+        "store": "apple",
+        "appId": "6480417616",
+        "market": "br",
+        "name": "Cal AI",
+        "developer": "Sploot Inc.",
+        "category": "Health & Fitness",
+        "rank": 5,
+        "rating": 4.8,
+        "ratingsCount": 250000,
+        "priceUsd": 0,
+        "iapPresent": true,
+        "description": "Cal AI conta calorias automaticamente das suas refeições — basta tirar uma foto. Acompanhe macros, calorias e progresso. Mais de 15 idiomas suportados, incluindo português brasileiro.",
+        "screenshotUrls": [],
+        "iconUrl": null,
+        "releaseDate": "2024-05-01T00:00:00.000Z",
+        "lastUpdated": "2026-04-01T00:00:00.000Z",
+        "scrapedAt": "2026-04-29T00:00:00.000Z"
+      },
+      "expectedLocGapMax": 3.0,
+      "expectedSignals": {
+        "hasNativeLanguage": true,
+        "hasCulturalAdaptation": true
+      }
+    },
+    {
+      "id": "picturethis-jp",
+      "label": "PictureThis in JP (10-lang localized)",
+      "app": {
+        "store": "apple",
+        "appId": "1252497129",
+        "market": "jp",
+        "name": "PictureThis - 植物識別",
+        "developer": "Glority Global Group Ltd",
+        "category": "Education",
+        "rank": 2,
+        "rating": 4.7,
+        "ratingsCount": 180000,
+        "priceUsd": 0,
+        "iapPresent": true,
+        "description": "PictureThisは、AIで植物を即座に識別。1万種以上の植物データベース。10言語対応。",
+        "screenshotUrls": [],
+        "iconUrl": null,
+        "releaseDate": "2017-06-01T00:00:00.000Z",
+        "lastUpdated": "2026-04-15T00:00:00.000Z",
+        "scrapedAt": "2026-04-29T00:00:00.000Z"
+      },
+      "expectedLocGapMax": 3.0,
+      "expectedSignals": {
+        "hasNativeLanguage": true
+      }
+    },
+    {
+      "id": "remini-de",
+      "label": "Remini in DE (well-localized)",
+      "app": {
+        "store": "google",
+        "appId": "com.bigwinepot.nwdn.international",
+        "market": "de",
+        "name": "Remini - KI-Foto-Verbesserung",
+        "developer": "Bending Spoons",
+        "category": "Photography",
+        "rank": 8,
+        "rating": 4.6,
+        "ratingsCount": 1500000,
+        "priceUsd": 0,
+        "iapPresent": true,
+        "description": "Remini erweckt alte Fotos zum Leben. KI-gestützte Bildverbesserung in HD. Vollständig auf Deutsch lokalisiert.",
+        "screenshotUrls": [],
+        "iconUrl": null,
+        "releaseDate": "2019-11-01T00:00:00.000Z",
+        "lastUpdated": "2026-04-10T00:00:00.000Z",
+        "scrapedAt": "2026-04-29T00:00:00.000Z"
+      },
+      "expectedLocGapMax": 3.5,
+      "expectedSignals": {
+        "hasNativeLanguage": true
+      }
+    },
+    {
+      "id": "indie-utility-en-only-fr",
+      "label": "Indie utility English-only on FR top chart at $1M ARR",
+      "app": {
+        "store": "apple",
+        "appId": "synthetic-1",
+        "market": "fr",
+        "name": "ChronoTrack Pro",
+        "developer": "SoloDev",
+        "category": "Productivity",
+        "rank": 23,
+        "rating": 4.5,
+        "ratingsCount": 30000,
+        "priceUsd": 0,
+        "iapPresent": true,
+        "description": "Track time on tasks effortlessly. The simplest time tracker for freelancers. No setup required. Just tap and go.",
+        "screenshotUrls": [],
+        "iconUrl": null,
+        "releaseDate": "2023-01-01T00:00:00.000Z",
+        "lastUpdated": "2025-12-01T00:00:00.000Z",
+        "scrapedAt": "2026-04-29T00:00:00.000Z"
+      },
+      "expectedLocGapMin": 7.0,
+      "expectedSignals": {
+        "hasNativeLanguage": false,
+        "hasLocalizedPaywall": false
+      }
+    },
+    {
+      "id": "machine-translated-paywall-br",
+      "label": "Productivity app with machine-translated PT paywall",
+      "app": {
+        "store": "google",
+        "appId": "synthetic-2",
+        "market": "br",
+        "name": "FocusGuru",
+        "developer": "GuruApps",
+        "category": "Productivity",
+        "rank": 41,
+        "rating": 4.2,
+        "ratingsCount": 50000,
+        "priceUsd": 0,
+        "iapPresent": true,
+        "description": "Aumente sua productividade. Bloqueia distracções e gerencia o seu tempo. Plano premium $9.99/mês.",
+        "screenshotUrls": [],
+        "iconUrl": null,
+        "releaseDate": "2022-06-01T00:00:00.000Z",
+        "lastUpdated": "2025-09-01T00:00:00.000Z",
+        "scrapedAt": "2026-04-29T00:00:00.000Z"
+      },
+      "expectedLocGapMin": 5.0,
+      "expectedLocGapMax": 7.5,
+      "expectedSignals": {
+        "hasLocalPaymentMethod": false
+      }
+    },
+    {
+      "id": "no-pt-localization-high-revenue",
+      "label": "App with no PT-BR localization, $5M+ revenue",
+      "app": {
+        "store": "apple",
+        "appId": "synthetic-3",
+        "market": "br",
+        "name": "ZenMind Meditation",
+        "developer": "ZenMind LLC",
+        "category": "Health & Fitness",
+        "rank": 12,
+        "rating": 4.7,
+        "ratingsCount": 800000,
+        "priceUsd": 0,
+        "iapPresent": true,
+        "description": "Reduce stress with daily guided meditations. 10 minutes a day, 30 days to a calmer mind.",
+        "screenshotUrls": [],
+        "iconUrl": null,
+        "releaseDate": "2018-01-01T00:00:00.000Z",
+        "lastUpdated": "2026-03-01T00:00:00.000Z",
+        "scrapedAt": "2026-04-29T00:00:00.000Z"
+      },
+      "expectedLocGapMin": 8.0
+    },
+    {
+      "id": "localized-but-no-pix-br",
+      "label": "Fully localized BR app but no PIX integration",
+      "app": {
+        "store": "apple",
+        "appId": "synthetic-4",
+        "market": "br",
+        "name": "FinanceHero",
+        "developer": "FinanceHero Inc.",
+        "category": "Finance",
+        "rank": 19,
+        "rating": 4.4,
+        "ratingsCount": 120000,
+        "priceUsd": 0,
+        "iapPresent": true,
+        "description": "Controle suas finanças. Acompanhe gastos, receitas e investimentos em reais. Plano premium R$19,90/mês via cartão de crédito.",
+        "screenshotUrls": [],
+        "iconUrl": null,
+        "releaseDate": "2020-08-01T00:00:00.000Z",
+        "lastUpdated": "2026-02-01T00:00:00.000Z",
+        "scrapedAt": "2026-04-29T00:00:00.000Z"
+      },
+      "expectedLocGapMin": 4.5,
+      "expectedLocGapMax": 6.5,
+      "expectedSignals": {
+        "hasLocalPaymentMethod": false,
+        "hasNativeLanguage": true
+      }
+    },
+    {
+      "id": "cultural-mismatch-jp",
+      "label": "Calorie counter with US-style food imagery in JP",
+      "app": {
+        "store": "google",
+        "appId": "synthetic-5",
+        "market": "jp",
+        "name": "BurgerCount",
+        "developer": "FastFoodApps",
+        "category": "Health & Fitness",
+        "rank": 80,
+        "rating": 3.9,
+        "ratingsCount": 8000,
+        "priceUsd": 0,
+        "iapPresent": true,
+        "description": "カロリーを追跡。バーガー、ピザ、ホットドッグなど。",
+        "screenshotUrls": [],
+        "iconUrl": null,
+        "releaseDate": "2021-04-01T00:00:00.000Z",
+        "lastUpdated": "2025-06-01T00:00:00.000Z",
+        "scrapedAt": "2026-04-29T00:00:00.000Z"
+      },
+      "expectedLocGapMin": 5.5,
+      "expectedSignals": {
+        "hasCulturalAdaptation": false
+      }
+    },
+    {
+      "id": "dying-category-low-priority",
+      "label": "App in dying category (RSS reader 2026)",
+      "app": {
+        "store": "apple",
+        "appId": "synthetic-6",
+        "market": "us",
+        "name": "OldFeed RSS",
+        "developer": "LegacyApps",
+        "category": "News",
+        "rank": 245,
+        "rating": 4.0,
+        "ratingsCount": 3000,
+        "priceUsd": 4.99,
+        "iapPresent": false,
+        "description": "Read your RSS feeds. Classic RSS reader for power users.",
+        "screenshotUrls": [],
+        "iconUrl": null,
+        "releaseDate": "2014-01-01T00:00:00.000Z",
+        "lastUpdated": "2024-08-01T00:00:00.000Z",
+        "scrapedAt": "2026-04-29T00:00:00.000Z"
+      },
+      "expectedLocGapMax": 4.0,
+      "expectedConfidenceMax": 0.8,
+      "comment": "Dying category — gap may exist but priority/confidence should reflect low signal."
+    },
+    {
+      "id": "growing-category-weak-incumbent-de",
+      "label": "AI study tutor in DE (growing category, weak EN-only incumbent)",
+      "app": {
+        "store": "apple",
+        "appId": "synthetic-7",
+        "market": "de",
+        "name": "StudyBuddy AI",
+        "developer": "StudyBuddy Inc.",
+        "category": "Education",
+        "rank": 35,
+        "rating": 4.6,
+        "ratingsCount": 60000,
+        "priceUsd": 0,
+        "iapPresent": true,
+        "description": "AI tutor for students. Solve homework problems instantly with step-by-step explanations.",
+        "screenshotUrls": [],
+        "iconUrl": null,
+        "releaseDate": "2024-09-01T00:00:00.000Z",
+        "lastUpdated": "2026-04-20T00:00:00.000Z",
+        "scrapedAt": "2026-04-29T00:00:00.000Z"
+      },
+      "expectedLocGapMin": 6.5,
+      "expectedSignals": {
+        "hasNativeLanguage": false
+      }
+    }
+  ]
+}

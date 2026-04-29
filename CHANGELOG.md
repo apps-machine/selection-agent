@@ -5,6 +5,32 @@ All notable changes to `@apps-machine/selection-agent` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-04-29
+
+M4 — LLM judges + lang quality eval. Selection Agent can now grade the localization gap and cultural fit of a candidate app via Claude, and self-eval its own translation quality before recommending a market.
+
+### Added
+
+- **`src/judges/schemas.ts`** — Zod schemas for `TextJudgeResult`, `VisionJudgeResult` (discriminated union via `kind`), and `LangQualityResult`. `passes` flag is refined to require `semanticEquivalenceScore >= 8.0`. Shared `Reasoning` type capped at 600 chars to bound prompt-injection blast radius from app descriptions.
+- **`src/judges/text-judge.ts`** — `judgeAppText({ app, client })` scores localization gap (0-10) via Anthropic SDK tool-use forced to `score_localization_gap`. Default model `claude-sonnet-4-6`. Returns `Result<TextJudgeResult, Error>` so the orchestrator can score candidates partially when one judge fails.
+- **`src/judges/vision-judge.ts`** — `judgeAppVision({ app, client, fetchImage })` scores cultural fit on screenshots via the same Sonnet 4.6 multi-modal endpoint. Caps at 5 screenshots, 5 MB per image, 10 s per fetch (AbortSignal). Tolerates partial-fetch failure: continues with whatever was retrieved and records the actual count in `screenshotsAnalyzed`.
+- **`src/judges/lang-quality-eval.ts`** — `evaluateLanguageQuality({ language, market, phrases, client })` runs a 3-call self-eval per language: forward translation EN → target, literal back-translation target → EN, and Claude-as-judge semantic equivalence scoring per phrase. Mean score gates `passes` at the 8.0 threshold.
+- **`src/judges/cache.ts`** — 30-day SQLite cache (reuses the M2 `scrape_cache` table) for judge calls. SHA256-hashed key over `(JUDGE_SCHEMA_VERSION, kind, model, appId, market, contentDigest)`. `withJudgeCache(...)` wrapper for orchestrator-level integration; judges stay pure so eval suites bypass the cache cleanly. Bumping `JUDGE_SCHEMA_VERSION` invalidates all old entries.
+- **`src/judges/budget.ts`** — `CostBudget` cost tracker with founder-set $20/scan default cap. Pricing table for Sonnet 4.6 ($3 / $15 per MTok), Opus 4.7 ($15 / $75), Haiku 4.5 ($0.80 / $4). `recordAndAssert(usage)` plumbs as the `onTokenUsage` callback for fail-fast on cap breach.
+- **`evals/text-judge.eval.ts`** — 10 eval cases drawn from real apps (Cal AI BR, PictureThis JP, Remini DE) and synthetic patterns (English-only on FR top chart, machine-translated PT paywall, no-PIX BR finance app, etc.). Asserts `locGapScore` within case-defined ranges; baseline drift gate at 10%.
+- **`evals/vision-judge.eval.ts`** — structurally wired; activation pending screenshot binaries dropped under `fixtures/screenshots/{case-id}/`.
+- **`evals/lang-quality.eval.ts`** — runs the 50-phrase back-translation eval against the 6 founder-confirmed Phase 0 markets (US/JP/DE/FR/BR/ES). The `en/us` baseline must score >= 9.0.
+- **`evals/fixtures/lang-corpus.json`** — 50 EN phrases drawn from real mobile-app paywall, onboarding, ASO, and notification copy patterns (founder-confirmed corpus type B over Tatoeba). Covers paywall CTAs, sign-in flows, demographic onboarding, social proof, notification copy, ASO keywords, pricing/billing, restore + share flows.
+- **`evals/fixtures/lang-targets.json`** — Phase 0 markets pinned: US (en baseline), JP (ja), DE (de), FR (fr), BR (pt-BR), ES (es). pt-BR over generic pt; es-ES over es-MX (LATAM enters Phase 1).
+
+### Changed
+
+- All eval suites are gated by `EVALS=1 ANTHROPIC_API_KEY=...`; baselines live in `evals/baselines/` and are regenerated with `WRITE_BASELINE=1`. CI does not auto-run them.
+
+### Security
+
+- Adversarial review surfaced two P0 risks in vision-judge that are now closed before any release: missing fetch timeout (resource leak / hang) and missing base64 size cap (cost runaway from a single 10 MB+ App Store screenshot). Four P1 hardenings landed alongside: inline budget enforcement via `recordAndAssert`, schema version in cache key (prevents stale-blob deserialization mismatch on future schema bumps), `reasoning` length cap in both JSON Schema (`minLength: 1`, `maxLength: 600`) and Zod (closes the drift where an empty-string reasoning would pass the API but throw post-call), and prompt-injection blast-radius cap on the same field.
+
 ## [0.2.1] - 2026-04-29
 
 ### Changed

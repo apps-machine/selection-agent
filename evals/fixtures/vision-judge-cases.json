@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "comment": "10 vision-judge eval cases. Each case names a representative pattern and expected score range. Real screenshot URLs would be wired in by the founder before running EVALS=1.",
+  "cases": [
+    {
+      "id": "culturally-adapted-jp-food",
+      "label": "JP food/recipe app with native imagery + JP captions",
+      "marketHint": "jp",
+      "expectedCulturalFitMax": 3.0,
+      "expectedSignals": {
+        "screenshotsLocalized": true,
+        "imagesCulturallyAdapted": true,
+        "textInLanguage": true
+      }
+    },
+    {
+      "id": "us-only-imagery-jp-listing",
+      "label": "JP listing with US burgers/pizza screenshots",
+      "marketHint": "jp",
+      "expectedCulturalFitMin": 6.5,
+      "expectedSignals": {
+        "imagesCulturallyAdapted": false
+      }
+    },
+    {
+      "id": "generic-stock-photos",
+      "label": "Stock photo screenshots (low investment signal)",
+      "marketHint": "any",
+      "expectedCulturalFitMin": 4.0,
+      "expectedCulturalFitMax": 6.5
+    },
+    {
+      "id": "localized-text-english-imagery",
+      "label": "Translated captions on English imagery (machine-translated style)",
+      "marketHint": "br",
+      "expectedCulturalFitMin": 4.0,
+      "expectedCulturalFitMax": 6.5,
+      "expectedSignals": {
+        "textInLanguage": true,
+        "imagesCulturallyAdapted": false
+      }
+    },
+    {
+      "id": "native-language-and-culture",
+      "label": "Native language captions + culturally relevant imagery",
+      "marketHint": "fr",
+      "expectedCulturalFitMax": 3.0,
+      "expectedSignals": {
+        "screenshotsLocalized": true,
+        "imagesCulturallyAdapted": true,
+        "textInLanguage": true
+      }
+    },
+    {
+      "id": "text-heavy-non-en",
+      "label": "Text-heavy screenshots in non-EN — translation quality matters",
+      "marketHint": "de",
+      "expectedConfidenceMin": 0.6
+    },
+    {
+      "id": "english-brand-foreign-market",
+      "label": "Logo/brand visible in EN on foreign market without localization",
+      "marketHint": "br",
+      "expectedCulturalFitMin": 4.0,
+      "expectedSignals": {
+        "screenshotsLocalized": false
+      }
+    },
+    {
+      "id": "stale-screenshots",
+      "label": "Years-old screenshots (UI does not match current OS look)",
+      "marketHint": "us",
+      "expectedSignals": {
+        "screenshotFreshness": "stale"
+      }
+    },
+    {
+      "id": "amateur-composition",
+      "label": "Amateur screenshot composition vs polished",
+      "marketHint": "any",
+      "expectedConfidenceMin": 0.5
+    },
+    {
+      "id": "culturally-appropriate-onboarding",
+      "label": "Onboarding screen with culturally appropriate signals",
+      "marketHint": "es",
+      "expectedCulturalFitMax": 3.5,
+      "expectedSignals": {
+        "imagesCulturallyAdapted": true
+      }
+    }
+  ]
+}
