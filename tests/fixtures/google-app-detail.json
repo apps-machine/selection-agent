@@ -1,0 +1,15 @@
+{
+  "appId": "com.duolingo.app",
+  "title": "Duolingo: idiomas grátis",
+  "developer": "Duolingo",
+  "genre": "Education",
+  "price": 0,
+  "free": true,
+  "score": 4.6,
+  "ratings": 18500000,
+  "icon": "https://example.com/duolingo-icon.png",
+  "description": "Aprenda idiomas grátis com aulas divertidas. Mais de 30 idiomas.",
+  "screenshots": ["https://example.com/duolingo-1.png"],
+  "offersIAP": true,
+  "IAPRange": "$1.99 - $79.99 per item"
+}
