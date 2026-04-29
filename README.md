@@ -36,14 +36,18 @@ Requires [Bun](https://bun.sh) ≥ 1.0.
 ## Commands
 
 ```bash
-selection-agent demo                       # cached snapshot, no API key — works today
-selection-agent scan                        # live dual-store scan (M2-M6, needs ANTHROPIC_API_KEY)
-selection-agent scan --no-llm               # heuristics only (M3 — heuristic scorers shipped)
-selection-agent scan --top 50               # limit candidates (M2)
-selection-agent scan --format json          # JSON output (M2)
-selection-agent snapshot                    # daily Track B writer (M5)
-selection-agent report --compare-judges     # text vs vision judge divergence (M6)
-selection-agent --help                      # full help — works today
+selection-agent demo                       # cached snapshot, no API key
+selection-agent scan                        # live dual-store scan (needs ANTHROPIC_API_KEY)
+selection-agent scan --no-llm               # heuristics only — skip LLM judges
+selection-agent scan --top 50               # limit candidates returned
+selection-agent scan --markets us,jp,fr     # restrict to specific ISO alpha-2 markets
+selection-agent scan --stores apple,google  # restrict to one store
+selection-agent scan --format json          # JSON output (default: markdown brief)
+selection-agent scan --budget 5             # USD cost cap for the run (default 20)
+selection-agent snapshot                    # daily Track B writer — cron-friendly, no LLM calls
+selection-agent report --compare-judges     # text vs vision judge divergence (latest run)
+selection-agent report --compare-judges --run-id run-X  # divergence for a specific run
+selection-agent --help                      # full help
 ```
 
 The agent ranks markets globally — there is no `--market BR` flag. Filter via your founder risk thresholds (e.g., 3 simultaneous markets max, lang quality ≥ 8/10) downstream.
@@ -86,10 +90,10 @@ Phase 0 ships incrementally:
 | M1 | Multi-repo open core scaffolding | shipped (v0.1.0) |
 | M2 | Dual-OS dual-store scrapers + 3-tier resilience | shipped (v0.1.0) |
 | M3 | Heuristic scoring (loc gap, paywall, revenue, composite) + token-bucket rate limiter + Playwright Apple fallback | shipped (v0.2.0) |
-| M4 | Claude judges (text + vision) + lang quality eval | upcoming |
-| M5 | Velocity scaffolding (Track B time-series) | upcoming |
-| M6 | Demo dataset + orchestrator + reporting | upcoming |
-| M7 | citty CLI polish + tests + eval baselines + npm publish | upcoming |
+| M4 | Claude judges (text + vision) + lang quality eval | shipped (v0.3.0) |
+| M5 | Velocity scaffolding (Track B time-series) — `writeSnapshot` + `getVelocityScore` + `snapshot` CLI | shipped (v0.4.0) |
+| M6 | Orchestrator (`runScan`) + ranker + markdown briefs + judge-divergence report + `judge_result` table | shipped (v0.5.0) |
+| M7 | citty CLI polish + eval baselines + npm publish | upcoming |
 
 ## Architecture
 
