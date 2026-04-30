@@ -4,6 +4,7 @@ import { runDemo } from "../demo/run-demo.ts";
 import type { JudgeClient } from "../judges/text-judge.ts";
 import type { ImageFetcher, VisionJudgeClient } from "../judges/vision-judge.ts";
 import { runSnapshot } from "../velocity/run-snapshot.ts";
+import { renderBanner, VERSION } from "./banner.ts";
 import { formatError } from "./errors.ts";
 
 function parseList(v: unknown): string[] | undefined {
@@ -67,7 +68,7 @@ async function buildJudgeClients(noLlm: boolean): Promise<JudgeClients> {
 const main = defineCommand({
   meta: {
     name: "selection-agent",
-    version: "0.0.1",
+    version: VERSION,
     description:
       "Apps Machine Selection Agent — ranks app opportunities globally via dual-store scraping + Claude judges.",
   },
@@ -256,8 +257,10 @@ const main = defineCommand({
             });
 
             if (args.format === "json") {
+              // JSON consumers get pure JSON — no banner.
               process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
             } else {
+              process.stdout.write(renderBanner());
               process.stdout.write(generateBrief(result));
             }
             process.exit(0);

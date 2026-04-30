@@ -1,3 +1,4 @@
+import { renderBanner } from "../cli/banner.ts";
 import snapshot from "./snapshot-data.json" with { type: "json" };
 
 interface DemoCandidate {
@@ -31,6 +32,7 @@ export async function runDemo(opts: { format: "markdown" | "json" }): Promise<vo
 
 function renderMarkdownBrief(data: DemoSnapshot): string {
   const lines: string[] = [];
+  lines.push(renderBanner());
   lines.push(`# Selection Agent — Demo Brief`);
   lines.push(``);
   lines.push(`> Cached snapshot generated ${data.generatedAt}.`);

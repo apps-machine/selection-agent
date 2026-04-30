@@ -5,6 +5,19 @@ All notable changes to `@apps-machine/selection-agent` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.1] - 2026-04-30
+
+Polish patch — branded ASCII banner + version sync.
+
+### Added
+
+- **Branded ASCII banner** at the top of every markdown CLI output (`demo` + `scan`). Compact "AM" monogram + version + tagline + repo URL. Renders cleanly in terminals AND in markdown viewers (wrapped in a code fence). JSON output (`--format json`) skips the banner so machine consumers still get pure JSON.
+- **`renderBanner()` + `VERSION`** exported from new `src/cli/banner.ts`. Single source of truth: pulls version from `package.json` so a future bump flows everywhere automatically.
+
+### Fixed
+
+- **citty `meta.version`** was hardcoded `"0.0.1"` since pre-M1; now reads from `VERSION` constant (resolved from `package.json`). `selection-agent --version` now reports the correct version.
+
 ## [0.6.0] - 2026-04-30
 
 M7 — enrichment + smoke gate + eval drift gate + npm publish. Closes Phase 0.
