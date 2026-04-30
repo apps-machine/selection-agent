@@ -8,18 +8,11 @@ import pkg from "../../package.json" with { type: "json" };
 export const VERSION: string = pkg.version;
 
 /**
- * Branded ASCII banner shown at the top of every markdown CLI output
- * (demo + scan). JSON output skips the banner so machine consumers get
- * pure JSON.
- *
- * Design intent: compact (under 60 chars wide so it fits any default
- * terminal), branded enough to feel like a tool, not a prototype. The
- * "AM" monogram doubles as the logo without claiming to be art.
- *
- * The block-letter glyphs render as plain ASCII in any terminal. We
- * deliberately do NOT wrap in a markdown code fence: terminal users
- * (the primary consumer of `npx ... demo`) would see literal triple-
- * backticks, which look noisier than the glyphs themselves.
+ * Branded ASCII banner shown once per CLI invocation, before citty parses
+ * argv. That means the FIRST thing a `npx @apps-machine/selection-agent`
+ * user sees — including the no-arg help screen — is the brand. JSON
+ * output skips the banner (see shouldShowBanner in cli/index.ts) so
+ * machine consumers get pure JSON.
  */
 export function renderBanner(): string {
   const lines: string[] = [];

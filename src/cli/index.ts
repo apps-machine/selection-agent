@@ -220,7 +220,18 @@ const main = defineCommand({
               code: "MISSING_API_KEY",
               message: "ANTHROPIC_API_KEY is required for live scans",
               cause: "Live scans run text + vision judges via Anthropic.",
-              fix: "Export ANTHROPIC_API_KEY=... or rerun with --no-llm.",
+              fix: [
+                "1. Get a key: https://console.anthropic.com/settings/keys",
+                "2. Export it in your shell:",
+                "     export ANTHROPIC_API_KEY=sk-ant-api03-...",
+                "3. Re-run the scan:",
+                "     npx @apps-machine/selection-agent scan",
+                "",
+                "Or skip judges entirely (heuristics only, much weaker scores):",
+                "     npx @apps-machine/selection-agent scan --no-llm",
+                "",
+                "Tip: try `npx @apps-machine/selection-agent demo` first — zero config, no key.",
+              ],
               docs: "https://github.com/apps-machine/selection-agent#environment",
             }),
           );
@@ -258,10 +269,8 @@ const main = defineCommand({
             });
 
             if (args.format === "json") {
-              // JSON consumers get pure JSON — no banner.
               process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
             } else {
-              process.stdout.write(renderBanner());
               process.stdout.write(generateBrief(result));
             }
             process.exit(0);
@@ -416,5 +425,24 @@ const main = defineCommand({
     }),
   },
 });
+
+/**
+ * Print the branded banner once, before citty parses argv. Skipped when
+ * stdout is in JSON mode so machine consumers get pure JSON. This means
+ * the very first thing a `npx @apps-machine/selection-agent` user sees
+ * — including the no-arg help screen — is the brand.
+ */
+function shouldShowBanner(argv: string[]): boolean {
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a === "--format=json") return false;
+    if (a === "--format" && argv[i + 1] === "json") return false;
+  }
+  return true;
+}
+
+if (shouldShowBanner(process.argv.slice(2))) {
+  process.stdout.write(renderBanner());
+}
 
 runMain(main);

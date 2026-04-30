@@ -2,7 +2,13 @@ export interface AgentError {
   code: string;
   message: string;
   cause: string;
-  fix: string;
+  /**
+   * Single-line short fix, OR an array of lines for multi-step guidance
+   * (commands, links, alternatives). Array form renders one line per
+   * entry under the "fix:" header so users can copy-paste a real shell
+   * command instead of guessing.
+   */
+  fix: string | string[];
   docs?: string;
 }
 
@@ -22,8 +28,15 @@ export function formatError(err: AgentError): string {
   const lines = [
     paint(`✖ ${err.code}: ${err.message}`, `${BOLD}${RED}`),
     paint(`  cause: ${err.cause}`, YELLOW),
-    paint(`  fix:   ${err.fix}`, CYAN),
   ];
+  if (Array.isArray(err.fix)) {
+    lines.push(paint(`  fix:`, CYAN));
+    for (const step of err.fix) {
+      lines.push(paint(`    ${step}`, CYAN));
+    }
+  } else {
+    lines.push(paint(`  fix:   ${err.fix}`, CYAN));
+  }
   if (err.docs) {
     lines.push(paint(`  docs:  ${err.docs}`, CYAN));
   }

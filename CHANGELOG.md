@@ -5,6 +5,19 @@ All notable changes to `@apps-machine/selection-agent` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.1] - 2026-04-30
+
+CLI first-impression polish: branded banner now greets every user the moment they invoke the CLI, and the missing-API-key error is finally a copy-pasteable recipe instead of a broken hint.
+
+### Fixed
+
+- **Missing-API-key error message** previously told users to type `Export ANTHROPIC_API_KEY=...` (capital E), which bash and zsh both reject with `command not found: Export`. Lowered to `export` and rewritten as a numbered, copy-pasteable recipe with a link to the Anthropic console, the full re-run command, and a pointer to `demo` for users without a key.
+
+### Changed
+
+- **Branded ASCII banner** is now printed once per CLI invocation — including the no-arg help screen and `--help` — instead of only `demo` and `scan`. The very first thing a `npx @apps-machine/selection-agent` user sees is the brand. JSON output (`--format json`) still skips the banner so machine consumers get pure JSON.
+- `AgentError.fix` accepts `string | string[]`. Array form renders one indented line per step under the `fix:` header, enabling multi-step user guidance instead of cramming a recipe into a single sentence.
+
 ## [0.7.0] - 2026-04-30
 
 Default scan markets pivoted to the tier-2 SEA cluster + Bangladesh, where the localization-gap thesis is empirically alive.
