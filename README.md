@@ -3,7 +3,7 @@
 > Rank app opportunities globally — across 50+ markets, dual-store (Apple App Store + Google Play) — by localization gap, paywall complexity, estimated revenue, and Claude judges (text + vision).
 
 ```bash
-# Live on npm — current: v0.7.1 (M7 close-out + UX polish, 2026-04-30):
+# Live on npm — current: v0.7.1 (post-M7.5 UX polish, 2026-04-30):
 npx @apps-machine/selection-agent demo
 ```
 
