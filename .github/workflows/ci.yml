@@ -30,7 +30,15 @@ jobs:
       - name: Test
         run: bun test
       - name: Smoke test demo command
-        run: bun src/cli/index.ts demo | grep -q 'Top 3 candidates'
+        run: |
+          set -o pipefail
+          bun src/cli/index.ts demo > /tmp/demo.out
+          grep -q '^  ▄▀█ █▀▄▀█        APPS MACHINE' /tmp/demo.out \
+            || { echo 'demo missing branded banner'; exit 1; }
+          grep -q '^# Selection Agent — Demo Brief' /tmp/demo.out \
+            || { echo 'demo missing brief header'; exit 1; }
+          grep -qE '^## Top [0-9]+ candidates' /tmp/demo.out \
+            || { echo 'demo missing candidates table header'; exit 1; }
 
   gitleaks:
     runs-on: ubuntu-latest
