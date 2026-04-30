@@ -3,7 +3,7 @@
 > Rank app opportunities globally — across 50+ markets, dual-store (Apple App Store + Google Play) — by localization gap, paywall complexity, estimated revenue, and Claude judges (text + vision).
 
 ```bash
-# Live on npm as of v0.6.0 (M7 — 2026-04-30):
+# Live on npm — current: v0.7.1 (M7 close-out + UX polish, 2026-04-30):
 npx @apps-machine/selection-agent demo
 ```
 
@@ -35,7 +35,7 @@ selection-agent demo                       # cached snapshot, no API key
 selection-agent scan                        # live dual-store scan (needs ANTHROPIC_API_KEY)
 selection-agent scan --no-llm               # heuristics only — skip LLM judges
 selection-agent scan --top 50               # limit candidates returned
-selection-agent scan --markets us,jp,fr     # restrict to specific ISO alpha-2 markets
+selection-agent scan --markets us,jp,fr     # override default markets (default: bd,th,vn,my,id — tier-2 SEA cluster)
 selection-agent scan --stores apple,google  # restrict to one store
 selection-agent scan --format json          # JSON output (default: markdown brief)
 selection-agent scan --budget 5             # USD cost cap for the run (default 20)
@@ -88,7 +88,9 @@ Phase 0 ships incrementally:
 | M4 | Claude judges (text + vision) + lang quality eval | shipped (v0.3.0) |
 | M5 | Velocity scaffolding (Track B time-series) — `writeSnapshot` + `getVelocityScore` + `snapshot` CLI | shipped (v0.4.0) |
 | M6 | Orchestrator (`runScan`) + ranker + markdown briefs + judge-divergence report + `judge_result` table | shipped (v0.5.0) |
-| M7 | citty CLI polish + eval baselines + npm publish | upcoming |
+| M7 | citty CLI polish + eval baselines + npm publish | shipped (v0.6.0) |
+| M7.5 | Empirical thesis validation — pivot defaults to tier-2 SEA | shipped (v0.7.0) |
+| post-M7.5 UX polish | banner upfront + copy-pasteable API key recipe | shipped (v0.7.1) |
 
 ## Architecture
 
