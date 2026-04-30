@@ -15,9 +15,23 @@ const APPLE_COLLECTION_MAP: Record<string, string> = {
 
 function normalizeAppleEntry(raw: unknown): ChartEntry {
   const o = raw as Record<string, unknown>;
+  // Bundle ID (e.g., "com.google.ios.youtube") is what we store as `appId`.
+  // Older lib versions exposed it under `id`; newer ones under `appId`.
   const id = o.appId ?? o.id ?? o.trackId;
+  // Numeric track id (e.g., "284882215"). Required by apps.apple.com URLs
+  // (`/id<trackId>`). Apple's lib surfaces it under `trackId` on per-app
+  // results; chart list() entries surface the same numeric value under `id`
+  // when the lib hasn't been upgraded to expose `appId` separately.
+  const trackIdRaw = o.trackId ?? o.id;
+  const trackId =
+    typeof trackIdRaw === "string"
+      ? trackIdRaw
+      : typeof trackIdRaw === "number"
+        ? String(trackIdRaw)
+        : undefined;
   return {
     appId: String(id ?? ""),
+    trackId,
     title: typeof o.title === "string" ? o.title : (o.trackName as string | undefined),
     developer: typeof o.developer === "string" ? o.developer : (o.artistName as string | undefined),
     primaryGenre:
@@ -66,10 +80,19 @@ export function createAppleScraperLib(lib: AppleScraperLib): ScraperLib {
       if (query.store !== "apple") {
         throw new Error(`apple client received non-apple query: ${query.store}`);
       }
-      const raw = await lib.app({
-        id: query.appId,
-        country: query.market.toLowerCase(),
-      });
+      // `app-store-scraper`'s `app()` takes EITHER `id` (numeric trackId
+      // like "544007664") OR `appId` (bundle ID like "com.google.ios.youtube").
+      // Passing a bundle ID as `id` fails — the lib looks it up as a
+      // numeric trackId and gets nothing. M7's first demo-refresh run
+      // caught this (100% Apple enrichment failure across 10 apps); the
+      // smoke gate didn't catch it because smoke topN=1 + Google enriching
+      // = 1 Google candidate ranked, masking the Apple failure. We use
+      // a heuristic: numeric strings → `id`, anything else → `appId`.
+      const isNumericId = /^\d+$/.test(query.appId);
+      const lookup = isNumericId
+        ? { id: query.appId, country: query.market.toLowerCase() }
+        : { appId: query.appId, country: query.market.toLowerCase() };
+      const raw = await lib.app(lookup);
       const entry = normalizeAppleEntry(raw);
       const o = raw as Record<string, unknown>;
       return {

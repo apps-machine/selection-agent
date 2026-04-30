@@ -4,6 +4,7 @@ exports[`generateBrief() — golden renders the canonical fixture into the pinne
 "# Selection Agent — Scan 2026-04-29
 
 **Markets**: us, jp, de, fr, br, es  |  **Apps scanned**: 280  |  **Cost**: $1.23
+**Enrichment**: 279/280 enriched (1 chart-only fallback)
 
 ## Top 2 candidates
 
@@ -15,9 +16,9 @@ exports[`generateBrief() — golden renders the canonical fixture into the pinne
 - **Paywall complexity**: 6.5/10
 - **Velocity**: scaffolding (J0/14)
 - **Confidence**: 0.80
-- App Store: https://apps.apple.com/br/app/idcom.example.calai
+- App Store: https://apps.apple.com/br/app/id1234567890
 
-### #2 — Remini (google, jp) — composite 6.40/10
+### #2 — Remini (google, jp) — composite 6.40/10 _(chart-only)_
 
 - **Localization gap**: 5.5/10 (Partial JP localization but paywall stays English.)
 - **Cultural fit (vision)**: n/a (no vision judge — empty screenshots)

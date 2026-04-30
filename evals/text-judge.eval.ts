@@ -4,6 +4,7 @@ import { dirname, join } from "node:path";
 import Anthropic from "@anthropic-ai/sdk";
 import { type JudgeClient, judgeAppText } from "../src/judges/text-judge.ts";
 import { RawAppDataSchema } from "../src/types/raw-app-data.ts";
+import { assertDriftWithinTolerance } from "./drift-gate.ts";
 import cases from "./fixtures/text-judge-cases.json";
 
 const SHOULD_RUN = process.env.EVALS === "1" && typeof process.env.ANTHROPIC_API_KEY === "string";
@@ -14,7 +15,10 @@ const BASELINE_PATH = join(
   "text-judge.json",
 );
 
-const REGRESSION_THRESHOLD = 0.1;
+// ±1.0 absolute tolerance on the 0-10 locGapScore = ±10% drift. Pulled into
+// a constant so the M7 evals.yml gate can be re-tuned in one place if a
+// later milestone introduces per-case overrides.
+const SCORE_TOLERANCE = 1.0;
 
 interface BaselineEntry {
   caseId: string;
@@ -64,8 +68,14 @@ describe.skipIf(!SHOULD_RUN)("text-judge eval (live LLM, EVALS=1)", () => {
 
       const prev = baseline[c.id];
       if (prev) {
-        const drift = Math.abs(r.locGapScore - prev.locGapScore) / 10;
-        expect(drift).toBeLessThanOrEqual(REGRESSION_THRESHOLD);
+        const drift = assertDriftWithinTolerance({
+          actual: r.locGapScore,
+          baseline: prev.locGapScore,
+          tolerance: SCORE_TOLERANCE,
+        });
+        if (!drift.ok) {
+          throw new Error(`text-judge drift on case "${c.id}": ${drift.reason}`);
+        }
       }
       fresh.push({
         caseId: c.id,

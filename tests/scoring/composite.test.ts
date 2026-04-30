@@ -5,6 +5,7 @@ import type { RawAppData } from "../../src/types/raw-app-data.ts";
 const baseApp: RawAppData = {
   store: "apple",
   appId: "test",
+  trackId: null,
   market: "us",
   name: "Test App",
   developer: "Test Dev",

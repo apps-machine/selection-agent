@@ -7,6 +7,7 @@ import {
   type LangQualityClient,
 } from "../src/judges/lang-quality-eval.ts";
 import { LANG_QUALITY_PASS_THRESHOLD } from "../src/judges/schemas.ts";
+import { assertDriftWithinTolerance, assertPassesUnchanged } from "./drift-gate.ts";
 import corpus from "./fixtures/lang-corpus.json";
 import targets from "./fixtures/lang-targets.json";
 
@@ -18,7 +19,7 @@ const BASELINE_PATH = join(
   "lang-quality.json",
 );
 
-const REGRESSION_THRESHOLD = 0.1;
+const SCORE_TOLERANCE = 1.0;
 
 interface BaselineEntry {
   language: string;
@@ -70,9 +71,21 @@ describe.skipIf(!SHOULD_RUN)("lang-quality eval (live LLM, EVALS=1)", () => {
       const key = `${t.language}/${t.market}`;
       const prev = baseline[key];
       if (prev) {
-        const drift =
-          Math.abs(result.value.semanticEquivalenceScore - prev.semanticEquivalenceScore) / 10;
-        expect(drift).toBeLessThanOrEqual(REGRESSION_THRESHOLD);
+        const drift = assertDriftWithinTolerance({
+          actual: result.value.semanticEquivalenceScore,
+          baseline: prev.semanticEquivalenceScore,
+          tolerance: SCORE_TOLERANCE,
+        });
+        if (!drift.ok) {
+          throw new Error(`lang-quality drift on ${key}: ${drift.reason}`);
+        }
+        const passes = assertPassesUnchanged({
+          actual: result.value.passes,
+          baseline: prev.passes,
+        });
+        if (!passes.ok) {
+          throw new Error(`lang-quality regression on ${key}: ${passes.reason}`);
+        }
       }
       fresh.push({
         language: t.language,

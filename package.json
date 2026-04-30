@@ -1,6 +1,6 @@
 {
   "name": "@apps-machine/selection-agent",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "description": "Apps Machine — Selection Agent. Ranks app opportunities globally via dual-store (Apple App Store + Google Play) scraping, heuristic scoring, and Claude judges. Run `npx @apps-machine/selection-agent demo` for a 30s magical moment.",
   "type": "module",
   "bin": {
@@ -17,9 +17,11 @@
     "scan": "bun src/cli/index.ts scan",
     "snapshot": "bun src/cli/index.ts snapshot",
     "report": "bun src/cli/index.ts report",
+    "smoke": "bun scripts/smoke.ts",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
     "evals": "bun test ./evals/text-judge.eval.ts ./evals/lang-quality.eval.ts ./evals/vision-judge.eval.ts",
+    "evals:check": "EVALS=1 bun test ./evals/text-judge.eval.ts ./evals/lang-quality.eval.ts ./evals/vision-judge.eval.ts",
     "evals:write-baseline": "WRITE_BASELINE=1 bun run evals",
     "prepare": "[ -d .git ] && git config core.hooksPath .githooks 2>/dev/null || true"
   },

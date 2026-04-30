@@ -24,17 +24,26 @@ import {
 import { rank } from "../reporting/ranker.ts";
 import { scoreComposite } from "../scoring/composite.ts";
 import type { ScraperLib } from "../scrapers/api.ts";
+import { type AppScrapeJob, scrapeApps } from "../scrapers/app-scraper.ts";
 import { type ChartScrapeJob, scrapeCharts } from "../scrapers/chart-scraper.ts";
 import type { Cache } from "../storage/cache.ts";
 import type { RawAppData, Store } from "../types/raw-app-data.ts";
+import { RateLimiter } from "../util/rate-limit.ts";
 import { getVelocityScore } from "../velocity/delta.ts";
 import { type WriteSnapshotResult, writeSnapshot } from "../velocity/snapshot.ts";
+import { type EnrichmentSource, makeKey, mergeEnrichments } from "./enrich.ts";
 import type { FailedSlice, ScanResult, ScoredCandidate } from "./types.ts";
 
 export const PHASE_0_MARKETS = ["us", "jp", "de", "fr", "br", "es"] as const;
 const PHASE_0_STORES: readonly Store[] = ["apple", "google"];
 const SCRAPE_CACHE_TTL_SECONDS = 60 * 60;
 const MARKET_CONCURRENCY = 6;
+const APP_ENRICHMENT_CONCURRENCY = 8;
+// Shared per-host token bucket. Sized so charts(6) + apps(8) = 14 concurrent
+// calls don't all land on apple.com or play.google.com at once. Capacity 8
+// allows a small burst; refill 4/sec sustains under Akamai's tolerance band.
+const RATE_LIMIT_CAPACITY = 8;
+const RATE_LIMIT_REFILL_PER_SECOND = 4;
 
 export interface ScanInput {
   cache: Cache;
@@ -42,12 +51,31 @@ export interface ScanInput {
   stores?: readonly Store[];
   topN?: number;
   noLlm?: boolean;
+  /**
+   * When true (default), the pipeline runs an app-detail enrichment pass
+   * (`scrapeApps`) between the chart scrape and the snapshot write so the
+   * heuristic scorers receive full description + ratings. When false, the
+   * pipeline short-circuits enrichment and the snapshot/judges run on
+   * chart-quality data only — composite scores will be heavily degraded
+   * (chart entries have no description / ratings on most upstream libs).
+   * The CLI maps `--no-enrich` to false.
+   */
+  enrich?: boolean;
   scrapers: { apple: ScraperLib; google: ScraperLib };
   /** Required when `noLlm` is false. May be a stub when noLlm is true. */
   textClient: JudgeClient;
   visionClient: VisionJudgeClient;
   fetchImage: ImageFetcher;
   budget?: CostBudget;
+  /**
+   * Optional override of the shared per-host RateLimiter. Defaults to one
+   * `RateLimiter` (capacity 8, refill 4/sec) constructed inside `runScan`,
+   * which is shared between `scrapeCharts` and `scrapeApps` so charts(6) +
+   * apps(8) = 14 concurrent calls don't all land on apple.com or
+   * play.google.com at once and trip Akamai/Google rate limits. Tests can
+   * pass a no-op or a custom-tuned limiter.
+   */
+  rateLimiter?: RateLimiter;
   /** Override clock for tests. */
   now?: () => number;
   /** Seed for `runId`. Defaults to ISO timestamp; tests pin a string. */
@@ -86,25 +114,55 @@ function contentDigestVision(app: RawAppData, model: string): string {
 
 /**
  * Top-level scan: scrape charts for every (store × market) slice in
- * parallel, write the M5 snapshot, compute heuristic + judge scores,
- * and rank the survivors.
+ * parallel, enrich each chart entry with the app-detail endpoint
+ * (description + ratings), write the M5 snapshot, compute heuristic +
+ * judge scores, and rank the survivors.
  *
- * One blocked slice never kills the run — `Promise.allSettled` (inside
- * `scrapeCharts`) keeps the rest moving and the failed slice is
- * reported in `failedSlices`. The M5 snapshot write runs even when
- * judges fail, so Track B keeps accumulating during an LLM outage.
+ * Pipeline:
+ *
+ *   scrapeCharts (concurrency=6, shared rate limiter)
+ *        │  outcomes: chart-quality RawAppData[]   failures: FailedSlice[]
+ *        ▼
+ *   scrapeApps   (concurrency=8, shared rate limiter, opt-out via enrich:false)
+ *        │  outcomes: full AppDetails               failures: per-app errors
+ *        ▼
+ *   mergeEnrichments
+ *        │  enriched-or-chart-fallback RawAppData[] + per-app source
+ *        ▼
+ *   writeSnapshot                       (Track B — now sees enriched rows)
+ *        ▼
+ *   per-app: velocity + judges → composite → rank
+ *
+ * Resilience invariants:
+ *  - One blocked chart slice never kills the run: scrapeCharts catches
+ *    per-job errors into `failures`, the rest of the run continues.
+ *  - One failed enrichment never kills the run: scrapeApps reports failures
+ *    per-app, mergeEnrichments uses the chart entry as fallback, and
+ *    `enrichmentFailedCount` surfaces the count to the brief.
+ *  - Track B snapshot runs even when judges fail later — keeps accumulating
+ *    during an LLM outage. After M7 it sees enriched rows when enrichment
+ *    succeeded, which improves baseline quality going forward.
+ *  - One shared `RateLimiter` across charts + apps caps host concurrency so
+ *    14 concurrent calls (6 charts + 8 apps) don't trip Akamai/Google.
  */
 export async function runScan(input: ScanInput): Promise<ScanResult> {
   const markets = (input.markets ?? PHASE_0_MARKETS).slice();
   const stores = (input.stores ?? PHASE_0_STORES).slice();
   const topN = input.topN ?? 30;
   const noLlm = input.noLlm ?? false;
+  const enrich = input.enrich ?? true;
   const now = (input.now ?? Date.now)();
   const runId = makeRunId(input.runIdSeed, now);
   const generatedAt = new Date(now).toISOString();
   const budget = input.budget ?? new CostBudget();
   const textModel = input.textModel ?? DEFAULT_TEXT_JUDGE_MODEL;
   const visionModel = input.visionModel ?? DEFAULT_VISION_JUDGE_MODEL;
+  const rateLimiter =
+    input.rateLimiter ??
+    new RateLimiter({
+      capacity: RATE_LIMIT_CAPACITY,
+      refillPerSecond: RATE_LIMIT_REFILL_PER_SECOND,
+    });
 
   // 1. Scrape charts for every (store × market) slice. scrapeCharts uses
   //    mapWithConcurrency which catches per-job errors → failures array.
@@ -119,6 +177,7 @@ export async function runScan(input: ScanInput): Promise<ScanResult> {
     cacheTtlSeconds: SCRAPE_CACHE_TTL_SECONDS,
     clients: input.scrapers,
     concurrency: MARKET_CONCURRENCY,
+    rateLimiter,
   });
 
   const failedSlices: FailedSlice[] = chartReport.failures.map((f) => ({
@@ -127,25 +186,70 @@ export async function runScan(input: ScanInput): Promise<ScanResult> {
     reason: f.error.message,
   }));
 
-  const allApps: RawAppData[] = [];
-  const rankByKey = new Map<string, number>();
+  const chartApps: RawAppData[] = [];
   for (const outcome of chartReport.outcomes) {
     for (const app of outcome.apps) {
-      allApps.push(app);
-      if (app.rank !== null) {
-        rankByKey.set(`${app.store}:${app.appId}:${app.market}`, app.rank);
-      }
+      chartApps.push(app);
     }
   }
 
-  // 2. Snapshot side-effect — runs even if judges fail later.
+  // 2. Enrich each chart entry with app-detail (opt-out via --no-enrich).
+  //    Failures fall back to the chart entry; the count surfaces in the
+  //    brief so the founder knows which scores were computed on thin data.
+  let enrichedApps: RawAppData[];
+  let enrichmentSourceByKey: Map<string, EnrichmentSource>;
+  let enrichmentFailedCount: number;
+  if (enrich && chartApps.length > 0) {
+    const enrichJobs: AppScrapeJob[] = chartApps.map((app) => ({
+      store: app.store,
+      market: app.market,
+      appId: app.appId,
+      rank: app.rank,
+    }));
+    const enrichReport = await scrapeApps(enrichJobs, {
+      cache: input.cache,
+      cacheTtlSeconds: SCRAPE_CACHE_TTL_SECONDS,
+      clients: input.scrapers,
+      concurrency: APP_ENRICHMENT_CONCURRENCY,
+      rateLimiter,
+    });
+    const merged = mergeEnrichments({
+      chartApps,
+      outcomes: enrichReport.outcomes,
+      failures: enrichReport.failures,
+      logger: (msg, ctx) => logger.warn(ctx, msg),
+    });
+    enrichedApps = merged.apps;
+    enrichmentSourceByKey = merged.sources;
+    enrichmentFailedCount = merged.enrichmentFailedCount;
+  } else {
+    enrichedApps = chartApps;
+    enrichmentSourceByKey = new Map();
+    enrichmentFailedCount = 0;
+  }
+  const enrichmentSkipped = !enrich;
+
+  const rankByKey = new Map<string, number>();
+  for (const app of enrichedApps) {
+    if (app.rank !== null) {
+      rankByKey.set(`${app.store}:${app.appId}:${app.market}`, app.rank);
+    }
+  }
+
+  const snapshotDayIso = new Date(now).toISOString().slice(0, 10);
+
+  // 3. Snapshot side-effect — runs on enriched rows, even if judges fail later.
   let snapshotResult: WriteSnapshotResult;
   try {
     snapshotResult = writeSnapshot({
-      apps: allApps,
+      apps: enrichedApps,
       cache: input.cache,
       rankByKey,
       now: () => now,
+      // Pin the snapshot day from the orchestrator's `now` so tests with a
+      // fixed clock get deterministic snapshot rows. In production
+      // `input.now` defaults to `Date.now`, so this resolves to today UTC.
+      snapshotDay: snapshotDayIso,
     });
   } catch (e) {
     logger.warn(
@@ -155,7 +259,7 @@ export async function runScan(input: ScanInput): Promise<ScanResult> {
     snapshotResult = { written: 0, skipped: 0, day: new Date(now).toISOString().slice(0, 10) };
   }
 
-  // 3. Per-app: velocity + judges, then composite.
+  // 4. Per-app: velocity + judges, then composite.
   const onTokenUsage = (usage: TokenUsage): void => {
     budget.recordAndAssert(usage);
   };
@@ -164,12 +268,16 @@ export async function runScan(input: ScanInput): Promise<ScanResult> {
   const judgeStore = input.cache.judgeResultStore();
   const scored: ScoredCandidate[] = [];
 
-  for (const app of allApps) {
+  for (const app of enrichedApps) {
     const velocity = getVelocityScore({
       cache: input.cache,
       store: app.store,
       appId: app.appId,
       market: app.market,
+      // Pin the velocity asOf day to the orchestrator clock so tests with
+      // a fixed `now` get deterministic baselines. In production this
+      // resolves to today UTC (same as the previous implicit default).
+      asOf: snapshotDayIso,
     });
 
     let textJudge: TextJudgeResult | null = null;
@@ -237,7 +345,11 @@ export async function runScan(input: ScanInput): Promise<ScanResult> {
     }
 
     const composite = scoreComposite({ app, velocity });
-    scored.push({ app, composite, textJudge, visionJudge });
+    const key = makeKey(app.store, app.appId, app.market);
+    const enrichmentSource: ScoredCandidate["enrichmentSource"] = enrichmentSkipped
+      ? "skipped"
+      : (enrichmentSourceByKey.get(key) ?? "chart-only");
+    scored.push({ app, composite, textJudge, visionJudge, enrichmentSource });
   }
 
   const ranked = rank(scored, topN);
@@ -246,11 +358,13 @@ export async function runScan(input: ScanInput): Promise<ScanResult> {
     runId,
     generatedAt,
     markets,
-    appsScanned: allApps.length,
+    appsScanned: enrichedApps.length,
     costUsd: budget.spentUsd(),
     candidates: ranked,
     judgeResults,
     snapshotResult,
     failedSlices,
+    enrichmentFailedCount,
+    enrichmentSkipped,
   };
 }

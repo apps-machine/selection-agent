@@ -128,6 +128,12 @@ const main = defineCommand({
             "Run LLM judges (default: true). Pass --no-llm to skip judges and run heuristics only.",
           default: true,
         },
+        enrich: {
+          type: "boolean",
+          description:
+            "Fetch full app-detail (description, ratings, screenshots) for every chart entry before scoring (default: true). Pass --no-enrich for a cheap chart-only sweep — composite scores will be heavily degraded since real chart entries have no description / ratings.",
+          default: true,
+        },
         db: {
           type: "string",
           description:
@@ -184,6 +190,7 @@ const main = defineCommand({
           process.exit(2);
         }
         const noLlm = args.llm === false;
+        const enrich = args.enrich !== false;
         const dbPath =
           (typeof args.db === "string" && args.db) ||
           process.env.SELECTION_AGENT_DB ||
@@ -240,6 +247,7 @@ const main = defineCommand({
               stores,
               topN: top,
               noLlm,
+              enrich,
               scrapers: { apple, google },
               textClient,
               visionClient,

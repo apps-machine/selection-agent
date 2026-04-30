@@ -9,6 +9,15 @@ export type Store = z.infer<typeof StoreSchema>;
 export const RawAppDataSchema = z.object({
   store: StoreSchema,
   appId: z.string().min(1),
+  /**
+   * Apple-only numeric track id (e.g., `"284882215"`). Required by Apple
+   * App Store URLs (`/id<trackId>`); the `appId` we store for Apple is
+   * the bundle ID (e.g., `"com.google.ios.youtube"`) which Apple's URL
+   * format does NOT accept. Google entries always carry `null`. Older
+   * raw chart entries that don't surface trackId default to `null` and
+   * the link generator falls back to `appId`.
+   */
+  trackId: z.string().nullable().default(null),
   market: z.string().length(2).describe("ISO 3166-1 alpha-2 country code"),
   name: z.string(),
   developer: z.string(),

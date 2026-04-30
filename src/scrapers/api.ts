@@ -3,6 +3,12 @@ import type { RawAppData, Store } from "../types/raw-app-data.ts";
 /** Subset of Apple App Store / Google Play list() entries we map to RawAppData. */
 export interface ChartEntry {
   appId: string;
+  /**
+   * Apple-only numeric track id. Apple's `app-store-scraper` returns this as
+   * `trackId` (with `id` as an alias on chart entries). The bundle ID is what
+   * we put in `appId`. Google entries always carry `undefined`.
+   */
+  trackId?: string;
   title?: string;
   developer?: string | { devId?: string; devName?: string };
   genre?: string;
@@ -73,6 +79,33 @@ function detectIap(entry: ChartEntry | AppDetails): boolean {
   return false;
 }
 
+/**
+ * Coerce a date-ish string to ISO 8601 with offset, or `null` on failure.
+ *
+ * `RawAppDataSchema.releaseDate` / `lastUpdated` are validated with
+ * `z.string().datetime({ offset: true })`. Apple chart entries already
+ * surface ISO 8601 with offset; Apple per-app endpoints surface ISO 8601 in
+ * Z form (the M5/0.5.1 fix made the schema tolerate both). Google Play
+ * surfaces a human-readable string like `"Apr 21, 2014"` which Zod rejects
+ * — silently killing every Google snapshot write.
+ *
+ * Strategy: try ISO 8601 first (cheap pass-through if already valid); fall
+ * back to `Date.parse` for English locale-formatted strings (covers
+ * Google's format); on failure return `null`. We never throw — a bad date
+ * is better as null than as a snapshot that silently fails to persist.
+ */
+function coerceIsoDate(input: string | undefined): string | null {
+  if (!input) return null;
+  // ISO 8601 with offset (Apple chart) — pass through.
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?([+-]\d{2}:?\d{2}|Z)$/.test(input)) {
+    return input;
+  }
+  // Anything else: parse via Date and re-emit as Z-form ISO 8601.
+  const ms = Date.parse(input);
+  if (!Number.isFinite(ms)) return null;
+  return new Date(ms).toISOString();
+}
+
 export function mapToRawAppData(args: MapToRawArgs): RawAppData {
   const { store, market, rank, entry, scrapedAtIso } = args;
   const category = entry.primaryGenre ?? entry.genre ?? "Unknown";
@@ -82,6 +115,7 @@ export function mapToRawAppData(args: MapToRawArgs): RawAppData {
   return {
     store,
     appId: entry.appId,
+    trackId: entry.trackId ?? null,
     market,
     name: entry.title ?? entry.appId,
     developer,
@@ -99,8 +133,8 @@ export function mapToRawAppData(args: MapToRawArgs): RawAppData {
     description: entry.description ?? "",
     screenshotUrls: Array.isArray(entry.screenshots) ? entry.screenshots : [],
     iconUrl: entry.icon ?? null,
-    releaseDate: entry.released ?? null,
-    lastUpdated: entry.updated ?? null,
+    releaseDate: coerceIsoDate(entry.released),
+    lastUpdated: coerceIsoDate(entry.updated),
     scrapedAt: scrapedAtIso,
   };
 }

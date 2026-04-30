@@ -86,6 +86,42 @@ describe("runDemo", () => {
     expect(status).toBe(2);
   }, 30_000);
 
+  test("scan --no-llm --no-enrich produces JSON with enrichmentSkipped:true (citty wiring lock)", () => {
+    // The actual citty footgun guard: invoke --no-enrich and assert the
+    // pipeline saw enrich:false. JSON output is the load-bearing channel
+    // for this. Apple may be flaky in CI; tolerate that, but if JSON is
+    // produced we MUST see enrichmentSkipped:true. Anything else means
+    // citty silently ignored the flag (the PR #14 class of bug).
+    const { stdout, status, stderr } = runCli(
+      [
+        "scan",
+        "--no-llm",
+        "--no-enrich",
+        "--top",
+        "1",
+        "--markets",
+        "us",
+        "--stores",
+        "apple",
+        "--format",
+        "json",
+      ],
+      { ANTHROPIC_API_KEY: "" },
+    );
+    // Pre-flight must pass (status 0 or 1, never 2).
+    expect(status).not.toBe(2);
+    if (status === 0 && stdout.trim().startsWith("{")) {
+      const parsed = JSON.parse(stdout);
+      expect(parsed.enrichmentSkipped).toBe(true);
+      expect(parsed.enrichmentFailedCount).toBe(0);
+    } else {
+      // Apple network failed; the smoke gate is the right place to catch
+      // upstream drift. The pre-flight assertion above still proves the
+      // flag wasn't rejected.
+      expect(stderr).not.toContain("MISSING_API_KEY");
+    }
+  }, 60_000);
+
   test("json format emits valid JSON with topCandidates", async () => {
     const original = process.stdout.write;
     let captured = "";

@@ -1,43 +1,67 @@
 {
-  "generatedAt": "2026-04-28T00:00:00.000Z",
-  "marketsScanned": 6,
-  "candidatesEvaluated": 50,
+  "generatedAt": "2026-04-30T13:21:42.519Z",
+  "marketsScanned": 2,
+  "candidatesEvaluated": 10,
   "topCandidates": [
     {
       "rank": 1,
-      "appName": "PlantSnap (clone target)",
+      "appName": "ChatGPT",
       "store": "apple",
-      "market": "BR",
-      "category": "Reference",
-      "estimatedRevenueUsd": 4200000,
-      "localizationGap": 8,
-      "paywallComplexity": 3,
-      "compositeScore": 8.7,
-      "reasoning": "English-only listing in Brazil despite US revenue $4M+. Paywall is simple weekly sub with no PIX integration. High loc gap × low paywall complexity = strong clone candidate."
+      "market": "US",
+      "category": "Productivity",
+      "estimatedRevenueUsd": 343124300,
+      "localizationGap": 0,
+      "paywallComplexity": 0,
+      "compositeScore": 4,
+      "reasoning": "The US market is a native English-speaking market, and the app's description, name, and all metadata are fully in English. No language or cultural adaptation gap exists. A minor deduction is applied as there is no IAP/paywall to assess, but the app otherwise fits the market natively."
     },
     {
       "rank": 2,
-      "appName": "Calorie Tracker AI",
-      "store": "google",
-      "market": "MX",
-      "category": "Health & Fitness",
-      "estimatedRevenueUsd": 2800000,
-      "localizationGap": 7,
-      "paywallComplexity": 4,
-      "compositeScore": 8.1,
-      "reasoning": "Spanish copy is machine-translated (back-translation accuracy 62%, fails ≥8/10 lang quality threshold). Screenshots show US food only — strong cultural mismatch."
+      "appName": "YouTube",
+      "store": "apple",
+      "market": "JP",
+      "category": "Photo & Video",
+      "estimatedRevenueUsd": 477614500,
+      "localizationGap": 0,
+      "paywallComplexity": 0,
+      "compositeScore": 4,
+      "reasoning": "The app description is fully written in Japanese, covering all major features and legal disclosures in native language. The app is developed by Google, a global company with strong localization practices, and the content clearly targets Japanese users with culturally relevant categories (music, gaming, beauty, news). The only minor gap is the absence of local Japanese payment methods (e.g., carrier billing, convenience store payments) given IAP is not present, and some features are noted as available only in select countries."
     },
     {
       "rank": 3,
-      "appName": "Sleep Coach Pro",
+      "appName": "Snapchat",
       "store": "apple",
-      "market": "JP",
-      "category": "Health & Fitness",
-      "estimatedRevenueUsd": 1900000,
-      "localizationGap": 9,
-      "paywallComplexity": 2,
-      "compositeScore": 8.0,
-      "reasoning": "Zero Japanese localization, 1.9M revenue from English speakers in JP market. Paywall is single tier, easy to clone with localized variants."
+      "market": "US",
+      "category": "Photo & Video",
+      "estimatedRevenueUsd": 287378950,
+      "localizationGap": 0,
+      "paywallComplexity": 0,
+      "compositeScore": 4,
+      "reasoning": "Snapchat is a major US-headquartered app published natively in English for the US market. The description is fully in English, which is the native language of the market. No localization gap exists from a language standpoint; minor deductions reflect the absence of IAP/paywall localization signals, though this is trivially low-impact for an English-speaking market."
+    },
+    {
+      "rank": 4,
+      "appName": "YouTube",
+      "store": "apple",
+      "market": "US",
+      "category": "Photo & Video",
+      "estimatedRevenueUsd": 2347484200,
+      "localizationGap": 0,
+      "paywallComplexity": 0,
+      "compositeScore": 4,
+      "reasoning": "The US market is a native English-speaking market, so the fully English description, app name, and store presence are entirely appropriate. YouTube is Google's flagship video platform with deep US market integration, culturally adapted content (trending, music, gaming, news tailored to the US), and a long-established presence. Minor gap exists only due to the absence of IAP/paywall localization signals in the metadata."
+    },
+    {
+      "rank": 5,
+      "appName": "TikTok - Videos, Shop & LIVE",
+      "store": "apple",
+      "market": "US",
+      "category": "Entertainment",
+      "estimatedRevenueUsd": 913781000,
+      "localizationGap": 0,
+      "paywallComplexity": 0,
+      "compositeScore": 4,
+      "reasoning": "The app is published in the US market, which is a native English-speaking market, so the English-language description, name, and content are fully appropriate. TikTok includes culturally relevant features like shopping, LIVE streaming, and creator discovery that align well with US consumer behavior. No significant localization gap exists as English is the default language for this market."
     }
   ]
 }

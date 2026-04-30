@@ -7,6 +7,7 @@ function makeApp(overrides: Partial<RawAppData> = {}): RawAppData {
   return {
     store: "apple",
     appId: "com.test.calorie",
+    trackId: null,
     market: "us",
     name: "Calorie Counter",
     developer: "Test Dev",

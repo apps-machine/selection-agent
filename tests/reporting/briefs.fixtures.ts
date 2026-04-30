@@ -7,6 +7,7 @@ export function fixedScanResult(): ScanResult {
       app: {
         store: "apple",
         appId: "com.example.calai",
+        trackId: "1234567890",
         market: "br",
         name: "Cal AI: Calorie Tracker",
         developer: "Cal AI Inc.",
@@ -61,12 +62,14 @@ export function fixedScanResult(): ScanResult {
         confidence: 0.75,
         modelVersion: "claude-sonnet-4-6",
       },
+      enrichmentSource: "enriched",
     },
     {
       rank: 2,
       app: {
         store: "google",
         appId: "com.example.remini",
+        trackId: null,
         market: "jp",
         name: "Remini",
         developer: "Bending Spoons",
@@ -105,6 +108,7 @@ export function fixedScanResult(): ScanResult {
         modelVersion: "claude-sonnet-4-6",
       },
       visionJudge: null,
+      enrichmentSource: "chart-only",
     },
   ];
   return {
@@ -117,5 +121,7 @@ export function fixedScanResult(): ScanResult {
     judgeResults: [],
     snapshotResult: { written: 280, skipped: 0, day: "2026-04-29" },
     failedSlices: [],
+    enrichmentFailedCount: 1,
+    enrichmentSkipped: false,
   };
 }

@@ -7,6 +7,7 @@ import type { RawAppData } from "../../src/types/raw-app-data.ts";
 function makeApp(overrides: Partial<RawAppData> & Pick<RawAppData, "appId">): RawAppData {
   return {
     store: "apple",
+    trackId: null,
     market: "us",
     name: overrides.appId,
     developer: "Dev",
@@ -88,6 +89,7 @@ function candidate(args: {
     },
     textJudge: args.textConf === undefined ? null : textJudge(args.textConf),
     visionJudge: args.visionConf === undefined ? null : visionJudge(args.visionConf),
+    enrichmentSource: "enriched",
   };
 }
 

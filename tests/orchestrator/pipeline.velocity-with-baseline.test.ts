@@ -17,6 +17,7 @@ describe("runScan — velocity activates with 14d baseline", () => {
     const seedApp: RawAppData = {
       store: "apple",
       appId: "us.app1",
+      trackId: null,
       market: "us",
       name: "us.app1",
       developer: "FakeDev",

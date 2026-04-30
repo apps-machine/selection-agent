@@ -3,7 +3,19 @@ import type { CompositeOutput } from "../scoring/composite.ts";
 import type { RawAppData, Store } from "../types/raw-app-data.ts";
 import type { WriteSnapshotResult } from "../velocity/snapshot.ts";
 
-/** Per-app result the ranker consumes. Built by the pipeline. */
+/**
+ * Per-app result the ranker consumes. Built by the pipeline.
+ *
+ * `enrichmentSource` records how the app's RawAppData was produced:
+ *  - `"enriched"`  scrapeApps returned a per-app detail record (rich
+ *                  description + ratings); composite is computed on real data.
+ *  - `"chart-only"` scrapeApps failed for this slot — the chart entry
+ *                  was used as fallback. Composite is on thin data.
+ *  - `"skipped"`   scan ran with `--no-enrich`; no enrichment attempted.
+ *
+ * The brief renders a per-app `(chart-only)` tag whenever the source is
+ * `"chart-only"` so the founder knows which scores to distrust.
+ */
 export interface ScoredCandidate {
   app: RawAppData;
   composite: CompositeOutput;
@@ -11,6 +23,7 @@ export interface ScoredCandidate {
   textJudge: TextJudgeResult | null;
   /** null when --no-llm, when no screenshots, or when vision-judge errored. */
   visionJudge: VisionJudgeResult | null;
+  enrichmentSource: "enriched" | "chart-only" | "skipped";
 }
 
 /** Adds the final 1-based rank assigned by `rank()`. */
@@ -42,4 +55,13 @@ export interface ScanResult {
   snapshotResult: WriteSnapshotResult;
   /** Slices (store × market) whose scrape failed; reported in the brief footer. */
   failedSlices: FailedSlice[];
+  /**
+   * Number of chart entries whose enrichment scrape failed. The pipeline falls
+   * back to the chart entry for those apps; the brief surfaces this number in
+   * the header and tags each fallback candidate `(chart-only)`. Zero when
+   * enrichment was skipped.
+   */
+  enrichmentFailedCount: number;
+  /** True when scan ran with `--no-enrich`; scrapeApps was not called. */
+  enrichmentSkipped: boolean;
 }

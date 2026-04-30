@@ -39,16 +39,48 @@ export interface FakeScraperLibOptions {
   chartError?: Error;
   /** When set, every detail fetch throws. */
   appError?: Error;
+  /**
+   * Per-app failure injection for enrichment tests. When `fetchApp(q)` is
+   * called and `q.appId` is in this set, the call throws — but other apps
+   * still succeed. Lets us assert the pipeline tolerates a single
+   * enrichment failure without killing the run.
+   */
+  appErrorForAppIds?: ReadonlySet<string>;
+  /**
+   * When true, fetchChart strips ratings + description fields from the
+   * returned ChartEntry — the way real Apple chart endpoints do. Lets
+   * tests verify that enrichment is what populates those fields, not the
+   * chart scrape. fetchApp continues to return rich data.
+   */
+  chartStripped?: boolean;
 }
 
 export function fakeScraperLib(opts: FakeScraperLibOptions): ScraperLib {
   return {
     async fetchChart(q: ChartQuery): Promise<ChartEntry[]> {
       if (opts.chartError) throw opts.chartError;
-      return (opts.appsByMarket[q.market] ?? []).map(chartEntry);
+      const specs = opts.appsByMarket[q.market] ?? [];
+      return specs.map((spec) => {
+        const entry = chartEntry(spec);
+        if (opts.chartStripped) {
+          // Real Apple chart list() returns no ratings/description. Strip
+          // them so composite scoring on chart-only data computes ~0/10
+          // (the regression M7 unblocks).
+          return {
+            ...entry,
+            ratings: undefined,
+            reviews: undefined,
+            description: undefined,
+          };
+        }
+        return entry;
+      });
     },
     async fetchApp(q: AppQuery): Promise<AppDetails> {
       if (opts.appError) throw opts.appError;
+      if (opts.appErrorForAppIds?.has(q.appId)) {
+        throw new Error(`fakeScraperLib: forced enrichment failure for ${q.appId}`);
+      }
       const spec = (opts.appsByMarket[q.market] ?? []).find((a) => a.appId === q.appId);
       if (!spec) throw new Error(`fakeScraperLib: unknown app ${q.appId} in ${q.market}`);
       return chartEntry(spec) as AppDetails;

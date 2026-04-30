@@ -1,4 +1,5 @@
 import type { RankedCandidate, ScanResult } from "../orchestrator/types.ts";
+import type { RawAppData } from "../types/raw-app-data.ts";
 
 /**
  * Markdown founder brief. Pinned via `briefs.golden.test.ts` —
@@ -15,6 +16,7 @@ export function generateBrief(result: ScanResult): string {
       `**Apps scanned**: ${result.appsScanned}  |  ` +
       `**Cost**: $${result.costUsd.toFixed(2)}`,
   );
+  lines.push(`**Enrichment**: ${formatEnrichmentSummary(result)}`);
   lines.push("");
   lines.push(`## Top ${result.candidates.length} candidates`);
   lines.push("");
@@ -45,8 +47,9 @@ function renderCandidate(c: RankedCandidate): string[] {
   const lines: string[] = [];
   const { app } = c;
   const composite = c.composite.composite.toFixed(2);
+  const fallbackTag = c.enrichmentSource === "chart-only" ? " _(chart-only)_" : "";
   lines.push(
-    `### #${c.rank} — ${app.name} (${app.store}, ${app.market}) — composite ${composite}/10`,
+    `### #${c.rank} — ${app.name} (${app.store}, ${app.market}) — composite ${composite}/10${fallbackTag}`,
   );
   lines.push("");
 
@@ -82,7 +85,7 @@ function renderCandidate(c: RankedCandidate): string[] {
   const conf = meanConfidence(c);
   lines.push(`- **Confidence**: ${conf === null ? "n/a" : conf.toFixed(2)}`);
 
-  const link = appStoreLink(app.store, app.appId, app.market);
+  const link = appStoreLink(app);
   lines.push(`- App Store: ${link}`);
   lines.push("");
   return lines;
@@ -96,11 +99,33 @@ function meanConfidence(c: RankedCandidate): number | null {
   return xs.reduce((a, b) => a + b, 0) / xs.length;
 }
 
-function appStoreLink(store: "apple" | "google", appId: string, market: string): string {
-  if (store === "apple") {
-    return `https://apps.apple.com/${market}/app/id${appId}`;
+/**
+ * Apple App Store URLs require the numeric trackId (e.g. `id1234567890`),
+ * not the bundle ID (e.g. `com.google.ios.youtube`). M2 captured the bundle
+ * ID into `appId` and lost the trackId — every Apple link 404'd. M7 plumbs
+ * `trackId` through `RawAppData`. When present, we use it. When absent
+ * (older lib version, missing entry, or a Google app), we fall back to
+ * `appId` — best-effort even if the URL may still 404.
+ */
+export function appStoreLink(app: RawAppData): string {
+  if (app.store === "apple") {
+    const id = app.trackId ?? app.appId;
+    return `https://apps.apple.com/${app.market}/app/id${id}`;
   }
-  return `https://play.google.com/store/apps/details?id=${appId}&gl=${market}`;
+  return `https://play.google.com/store/apps/details?id=${app.appId}&gl=${app.market}`;
+}
+
+function formatEnrichmentSummary(result: ScanResult): string {
+  if (result.enrichmentSkipped) {
+    return "skipped (--no-enrich)";
+  }
+  const total = result.appsScanned;
+  const failed = result.enrichmentFailedCount;
+  const enriched = total - failed;
+  if (failed === 0) {
+    return `${enriched}/${total} enriched`;
+  }
+  return `${enriched}/${total} enriched (${failed} chart-only fallback)`;
 }
 
 function oneLine(s: string): string {

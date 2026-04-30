@@ -10,6 +10,7 @@ import { isErr, isOk } from "../../src/util/result.ts";
 const sampleApp: RawAppData = {
   store: "apple",
   appId: "1234567890",
+  trackId: "1234567890",
   market: "jp",
   name: "FocusFlow",
   developer: "Indie Co",

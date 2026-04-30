@@ -45,6 +45,63 @@ describe("apple-store-client", () => {
     expect(entries[0]?.title).toBe("Cal AI: Calorie Tracker");
   });
 
+  test("fetchChart surfaces numeric trackId separately from bundle-ID appId (M7)", async () => {
+    // Apple's chart list() returns BOTH `id` (numeric trackId, e.g.
+    // 1604029305) AND `appId` (bundle ID, e.g. "com.calai.calai"). Pre-M7
+    // we squashed both into `appId` so the brief's link generator received
+    // only the bundle ID and produced /id<bundleID> URLs that 404'd. M7
+    // surfaces trackId separately so appStoreLink can route correctly.
+    const client = createAppleScraperLib(makeMock());
+    const entries = await client.fetchChart({
+      store: "apple",
+      market: "US",
+      collection: "top-grossing",
+      limit: 200,
+    });
+    expect(entries[0]?.appId).toBe("com.calai.calai");
+    expect(entries[0]?.trackId).toBe("1604029305");
+  });
+
+  test("fetchApp surfaces trackId from the per-app endpoint (M7)", async () => {
+    const client = createAppleScraperLib(makeMock());
+    const detail = await client.fetchApp({
+      store: "apple",
+      market: "US",
+      appId: "1604029305",
+    });
+    expect(detail.trackId).toBe("1604029305");
+    expect(detail.appId).toBe("com.calai.calai");
+  });
+
+  test("mapToRawAppData propagates Apple trackId; Google entries get null", () => {
+    const apple = grossingFixture[0]!;
+    const rawApple = mapToRawAppData({
+      store: "apple",
+      market: "us",
+      rank: 1,
+      // The fixture is the raw Apple shape (id + appId). Pass through the
+      // normalizer to get a ChartEntry with trackId surfaced, then map.
+      entry: { ...apple, trackId: String(apple.id) },
+      scrapedAtIso: "2026-04-29T12:00:00.000Z",
+    });
+    expect(rawApple.trackId).toBe("1604029305");
+
+    // Google entries don't carry a trackId field at all → mapToRawAppData
+    // defaults to null so the link generator picks the play.google.com path.
+    const rawGoogle = mapToRawAppData({
+      store: "google",
+      market: "us",
+      rank: 1,
+      entry: {
+        appId: "com.example.remini",
+        title: "Remini",
+        description: "AI photo enhancer.",
+      },
+      scrapedAtIso: "2026-04-29T12:00:00.000Z",
+    });
+    expect(rawGoogle.trackId).toBeNull();
+  });
+
   test("fetchApp returns enriched details with inAppPurchases", async () => {
     const client = createAppleScraperLib(makeMock());
     const detail = await client.fetchApp({
@@ -55,6 +112,44 @@ describe("apple-store-client", () => {
     expect(detail.appId).toBe("com.calai.calai");
     expect(detail.description).toContain("AI-powered");
     expect(detail.inAppPurchases).toBe(true);
+  });
+
+  test("fetchApp routes numeric appId via `id` and bundle-ID appId via `appId` (M7 regression)", async () => {
+    // The first M7 demo refresh exposed this: app-store-scraper's `app()`
+    // takes EITHER `id` (numeric trackId) OR `appId` (bundle ID). Passing
+    // a bundle ID as `id` fails (lib looks it up as a numeric trackId and
+    // gets nothing) — 100% Apple enrichment failure across the 10-app
+    // demo refresh run. Pin the routing here so a future refactor can't
+    // re-flip the keys.
+    const captured: Array<Record<string, unknown>> = [];
+    const numericLib = makeMock({
+      app: async (opts) => {
+        captured.push(opts);
+        return appDetailFixture;
+      },
+    });
+    const bundleLib = makeMock({
+      app: async (opts) => {
+        captured.push(opts);
+        return appDetailFixture;
+      },
+    });
+
+    await createAppleScraperLib(numericLib).fetchApp({
+      store: "apple",
+      market: "US",
+      appId: "1604029305", // numeric trackId
+    });
+    expect(captured[0]?.id).toBe("1604029305");
+    expect(captured[0]?.appId).toBeUndefined();
+
+    await createAppleScraperLib(bundleLib).fetchApp({
+      store: "apple",
+      market: "US",
+      appId: "com.calai.calai", // bundle ID
+    });
+    expect(captured[1]?.appId).toBe("com.calai.calai");
+    expect(captured[1]?.id).toBeUndefined();
   });
 
   test("rejects non-apple store query", async () => {

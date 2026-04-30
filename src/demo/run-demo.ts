@@ -56,7 +56,10 @@ function renderMarkdownBrief(data: DemoSnapshot): string {
     lines.push(``);
   }
   lines.push(`---`);
-  lines.push(`Run \`selection-agent scan\` for a live ranking once milestone M2+ lands.`);
+  lines.push(`_Revenue figures are rough heuristics (ratings count × $50/year)_`);
+  lines.push(`_— ballpark for opportunity sizing only, not actual financials._`);
+  lines.push(``);
+  lines.push(`Run \`selection-agent scan\` for a live ranking against your own ANTHROPIC_API_KEY.`);
   lines.push(``);
   return lines.join("\n");
 }

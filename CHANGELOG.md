@@ -5,6 +5,68 @@ All notable changes to `@apps-machine/selection-agent` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-04-30
+
+M7 — enrichment + smoke gate + eval drift gate + npm publish. Closes Phase 0.
+
+### The unblock
+
+M6 wired the orchestrator end-to-end, but smoke-testing against real APIs found that scan returned composite **0.00/10 for every real-world candidate** — chart entries lack `ratingsCount` and `description`, so the heuristic scorers (revenue + locGap + paywall) computed zero across the board. M7 adds an app-detail enrichment pass between the chart scrape and the snapshot write, plus the missing process gates (live smoke, eval drift, npm publish) so the next bug found by an external user isn't another silent regression.
+
+### Added
+
+- **App-detail enrichment in `runScan`** — `src/orchestrator/enrich.ts` exports `mergeEnrichments(charts, outcomes, failures)` which joins chart entries with their per-app detail records keyed by `(store, appId, market)`. The pipeline calls `scrapeApps` (the existing M2 orchestrator with concurrency 8 + 3-tier resilience + cache) between `scrapeCharts` and `writeSnapshot`. Failed enrichments fall back to the chart entry — single-app failures don't kill the run.
+- **`--enrich` CLI flag** (default `true`) — `selection-agent scan --no-enrich` for a cheap chart-only sweep when you don't need real composite scores. Declared as `enrich: { type: 'boolean', default: true }` per the citty `--no-X` convention pinned by PR #14's regression.
+- **Shared `RateLimiter` in `runScan`** — one token bucket (capacity 8, refill 4/sec) shared between `scrapeCharts` (concurrency=6) and `scrapeApps` (concurrency=8). Without this, charts(6) + apps(8) = 14 concurrent calls per host trip Akamai/Google rate limits.
+- **`enrichmentFailedCount` + `enrichmentSkipped` on `ScanResult`** — additive fields, not breaking. The brief renders `**Enrichment**: X/Y enriched (Z chart-only fallback)` (or `skipped (--no-enrich)`) in the header and tags each fallback candidate `_(chart-only)_` so the founder knows which scores to distrust.
+- **`enrichmentSource` on `ScoredCandidate` / `RankedCandidate`** — `"enriched"` / `"chart-only"` / `"skipped"`. Powers the per-app brief tag.
+- **`trackId: string | null` on `RawAppDataSchema`** — Apple App Store URLs require the numeric track id (`/id544007664`), not the bundle ID (`com.google.ios.youtube`). Pre-M7 we stored only the bundle ID and every Apple link 404'd. Apple scraper now extracts trackId from `o.trackId ?? o.id`. Field defaults to `null` so M5/M6 snapshot rows back-compat cleanly.
+- **`appStoreLink(app: RawAppData)`** — refactored to take the full `RawAppData`. Apple uses `trackId` when present, falls back to `appId`. Google unchanged.
+- **`coerceIsoDate(input)` in `mapToRawAppData`** — first M7 smoke run caught that google-play-scraper returns `released` as a human-readable string (`"Apr 21, 2014"`) which `RawAppDataSchema` rejected, silently killing every Google snapshot write. The new helper coerces to ISO 8601 Z-form via `Date.parse`, returns `null` on failure.
+- **`scripts/smoke.ts` + `bun run smoke`** — live smoke test that hits the real `app-store-scraper` and `google-play-scraper` libs with the smallest possible workload (top 1, market US, both stores, --no-llm). Asserts wall-time < 30s, ≥1 candidate, snapshot persisted, composite > 0 (the unblock check), and well-formed app-store URLs.
+- **`evals/drift-gate.ts`** — internal-only `assertDriftWithinTolerance` and `assertPassesUnchanged` pure helpers. Each `evals/*.eval.ts` suite now uses these instead of inline drift logic, and the unit tests in `tests/evals/drift-gate.test.ts` lock the policy without spending Anthropic tokens.
+- **`bun run evals:check`** — `EVALS=1 bun test ./evals/*.eval.ts`. Runs the full eval suite against committed baselines and fails the workflow on any case drifting more than ±1.0 (10%) or flipping its `passes` flag.
+
+### Changed
+
+- **`src/orchestrator/pipeline.ts`** — pipeline now constructs `RateLimiter`, runs `scrapeApps` (when `enrich: true`), merges via `mergeEnrichments`, and pins `snapshotDay` + `getVelocityScore({ asOf })` to the orchestrator's clock so tests with a fixed `now` get deterministic snapshot rows. Pre-M7 the snapshot day defaulted to wall-clock `todayUtc()`, which made `pipeline.velocity-with-baseline.test.ts` flaky around UTC midnight.
+- **`evals/text-judge.eval.ts` + `evals/lang-quality.eval.ts`** — drift checks now go through `assertDriftWithinTolerance` + `assertPassesUnchanged`. Tolerance pulled into a single `SCORE_TOLERANCE = 1.0` constant per file. Behavior unchanged — same ±10% bar, same per-case failures.
+
+### Tests
+
+- 365 tests pass (was 320). 45 new tests across enrichment unit + integration, Apple link regression, schema back-compat, Google date coercion, and drift-gate logic. Detailed list:
+  - `tests/orchestrator/enrich.test.ts` (8) — happy / partial / total-fail / empty / appId-mismatch / rank preservation.
+  - `tests/orchestrator/pipeline.enrichment.test.ts` (2) — composite > 0 with enriched data; **regression**: writeSnapshot persists enriched rows, not chart fallbacks.
+  - `tests/orchestrator/pipeline.enrichment-failure.test.ts` (2) — 1/3 enrichments fail → 3 candidates returned, count=1, partial-fallback brief.
+  - `tests/orchestrator/pipeline.no-enrich.test.ts` (2) — short-circuit: scrapeApps never called, default still runs enrichment.
+  - `tests/cli.test.ts` (1) — subprocess `--no-enrich` wires through to JSON output (citty footgun guard).
+  - `tests/reporting/briefs.applelinks.test.ts` (5) — Apple trackId → numeric URL; missing trackId → bundle-ID fallback; Google unchanged.
+  - `tests/reporting/briefs.golden.test.ts` (2) — re-pinned snapshot includes header + per-app tag; new tests for skipped + fully-enriched copy.
+  - `tests/scrapers/raw-app-data-schema.test.ts` (8) — trackId accepts string/null/missing/non-string-non-null; `mapToRawAppData` coerces Google human dates to ISO; ISO with offset passes through; unparseable → null.
+  - `tests/scrapers/apple-store-client.test.ts` (3) — chart + per-app endpoints surface trackId; `mapToRawAppData` propagates it.
+  - `tests/evals/drift-gate.test.ts` (13) — within / outside tolerance; symmetric drift; default tolerance; passes flip.
+
+### Distribution
+
+- **First-time npm publish.** Triggered by tag push `selection-agent/v0.6.0`. Workflow gates publish on `bun run check` (typecheck + lint + knip + tests) AND `bun run smoke` (live upstream).
+- Requires `NPM_TOKEN` secret on the monorepo.
+- npm publish via `npm publish --access public --provenance` (NOT `bun publish`).
+
+### Notes
+
+- `vision-judge.eval.ts` is structurally a TODO until the founder drops curated screenshot fixtures + runs `WRITE_BASELINE=1 bun run evals` once. The drift gate will fail loud when vision is activated without a baseline.
+- Live verification snippet for the PR body: `bun src/cli/index.ts scan --no-llm --top 5 --markets us --stores apple --format markdown` should produce composite > 0 for ≥3 candidates, with every Apple App Store link using the numeric trackId form.
+
+### M7.5 thesis validation (2026-04-30, $0.21 spend)
+
+A diagnostic gate ran before this ship to test whether the locGap thesis is alive in 2026. Findings (full doc in `docs/planning/m7.5-thesis-validation.md`):
+
+- **Tier-1 markets (BR, MX, JP, DE, FR…) — thesis dead.** Top-5 Apple grossing in BR + MX scored locGap≤2 across the board (avg 1.0/10 BR, 1.4/10 MX). Global apps localize natively to tier-1.
+- **Tier-2 markets (ID, VN, TH, PH, MY…) — thesis alive.** Indonesia top-5 Apple grossing scored locGap=6-7 on 4 of 5 candidates (avg 5.8/10). ChatGPT, YouTube, and eFootball all ship default-English in Indonesia despite 270M-user market. The Rocket Internet 2015-2018 pattern still applies in the tier-2 SEA cluster.
+- **Implementation bug surfaced.** The heuristic locGap scorer is brittle (a single Cyrillic character flips detection) and reads Google's `summary` instead of full `description`. v0.7.0 will fix both. v0.6.0 ships with this known limitation; LLM judges are the source of truth.
+
+Phase 1 default markets will pivot from `[us,jp,de,fr,br,es]` to a subset of `[id,vn,th,my,ph]` in v0.7.0 based on a follow-up tier-2 scan.
+
 ## [0.5.1] - 2026-04-29
 
 M6 smoke-test fallout. Three bugs surfaced when running `selection-agent scan --no-llm --markets us --stores apple` against real Apple data — none of them were caught by M6's unit tests (all unit tests use injected fakes that don't replicate the upstream lib's runtime quirks). Track B was silently dead in production until this release.
