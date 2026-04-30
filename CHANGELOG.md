@@ -5,6 +5,44 @@ All notable changes to `@apps-machine/selection-agent` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-04-30
+
+Default scan markets pivoted to the tier-2 SEA cluster + Bangladesh, where the localization-gap thesis is empirically alive.
+
+### Changed
+
+- **Default markets** for `runScan` and the `selection-agent scan` CLI flipped from the original tier-1 list `[us, jp, de, fr, br, es]` to `[bd, th, vn, my, id]`. CLI consumers running `selection-agent scan --no-llm` (no `--markets` flag) now get a meaningfully different ranked output. Existing callers passing `markets: [...]` explicitly are unaffected.
+- **`PHASE_0_MARKETS`** export deprecated and re-aliased to the new `DEFAULT_MARKETS`. Existing v0.6.x consumers continue to work; the rename is a soft transition.
+
+### Added
+
+- **`DEFAULT_MARKETS`** export from `src/orchestrator/pipeline.ts` — the canonical tier-2 cluster list. JSDoc on the constant documents the M7.5 empirical finding that drove the change.
+
+### Why
+
+M7.5's LLM-judged scans (2026-04-30, $0.56 total Anthropic spend across 40 candidates) found the locGap thesis is **dead in tier-1 markets** and **alive in tier-2**:
+
+| Market | locGap≥6 hits | Avg locGap | Verdict |
+|---|---|---|---|
+| BD Bangladesh | 5/5 | 7.7/10 | strongest |
+| TH Thailand | 4/4 | 7.0/10 | strong |
+| VN Vietnam | 5/5 | 6.8/10 | alive |
+| MY Malaysia | 5/5 | 6.2/10 | alive |
+| ID Indonesia | 4/5 | 5.8/10 | alive |
+| PH Philippines | 0/4 | 4.5/10 | weak (English is co-official) |
+| BR Brazil | 0/5 | 1.0/10 | dead (Google/OpenAI ship native PT) |
+| MX Mexico | 0/5 | 1.4/10 | dead (Google/OpenAI ship native ES) |
+
+Top-grossing apps in tier-1 ship localized to those markets natively; tier-2 markets get default-English ports indefinitely. That's where the loc-gap arbitrage actually exists in 2026.
+
+PH was deliberately excluded from the default list (English is co-official, weakening the gap). Callers can still pass `--markets ph` explicitly when comparing.
+
+Full empirical write-up: `docs/planning/m7.5-thesis-validation.md`. CEO plan recording the decision: `~/.gstack/projects/apps-machine-studio/ceo-plans/2026-04-30-thesis-validation.md`.
+
+### Notes
+
+- The locGap heuristic itself still has known bugs (Cyrillic-character brittleness + Google `summary` field bias) that produce false positives in `--no-llm` mode. The LLM judges (text + vision) are the source of truth for ranking. Heuristic fix tracked as TODO-E in `TODOS.md`.
+
 ## [0.6.1] - 2026-04-30
 
 Polish patch — branded ASCII banner + version sync.

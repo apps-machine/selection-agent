@@ -34,7 +34,24 @@ import { type WriteSnapshotResult, writeSnapshot } from "../velocity/snapshot.ts
 import { type EnrichmentSource, makeKey, mergeEnrichments } from "./enrich.ts";
 import type { FailedSlice, ScanResult, ScoredCandidate } from "./types.ts";
 
-export const PHASE_0_MARKETS = ["us", "jp", "de", "fr", "br", "es"] as const;
+/**
+ * Default scan markets for `runScan` when the caller doesn't override.
+ *
+ * v0.7.0 pivoted these from the original Phase-0 list `[us,jp,de,fr,br,es]`
+ * to tier-2 SEA + Bangladesh. The rationale is empirical: M7.5's LLM-judged
+ * scan (2026-04-30, $0.56 spend across 40 candidates) found the
+ * localization-gap thesis is dead in tier-1 markets (avg locGap 1.0/10 in
+ * BR, 1.4/10 in MX) but alive in tier-2 (BD 7.7/10, TH 7.0/10, VN 6.8/10,
+ * MY 6.2/10, ID 5.8/10). Top-grossing apps in tier-1 are localized natively
+ * by Google/OpenAI/ByteDance; tier-2 markets get default-English ports
+ * 12-18 months late and indefinitely. PH was excluded because English is a
+ * co-official language there (avg locGap 4.5/10).
+ *
+ * Full empirical write-up: docs/planning/m7.5-thesis-validation.md.
+ *
+ * Callers can still pass `markets: ["us", ...]` explicitly to override.
+ */
+export const DEFAULT_MARKETS = ["bd", "th", "vn", "my", "id"] as const;
 const PHASE_0_STORES: readonly Store[] = ["apple", "google"];
 const SCRAPE_CACHE_TTL_SECONDS = 60 * 60;
 const MARKET_CONCURRENCY = 6;
@@ -146,7 +163,7 @@ function contentDigestVision(app: RawAppData, model: string): string {
  *    14 concurrent calls (6 charts + 8 apps) don't trip Akamai/Google.
  */
 export async function runScan(input: ScanInput): Promise<ScanResult> {
-  const markets = (input.markets ?? PHASE_0_MARKETS).slice();
+  const markets = (input.markets ?? DEFAULT_MARKETS).slice();
   const stores = (input.stores ?? PHASE_0_STORES).slice();
   const topN = input.topN ?? 30;
   const noLlm = input.noLlm ?? false;

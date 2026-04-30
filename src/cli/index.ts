@@ -112,7 +112,8 @@ const main = defineCommand({
         top: { type: "string", description: "Limit candidates returned", default: "30" },
         markets: {
           type: "string",
-          description: "Comma-separated ISO alpha-2 market codes (default: us,jp,de,fr,br,es)",
+          description:
+            "Comma-separated ISO alpha-2 market codes (default: bd,th,vn,my,id — tier-2 SEA cluster where the locGap thesis is empirically alive; see m7.5-thesis-validation.md)",
         },
         stores: {
           type: "string",
