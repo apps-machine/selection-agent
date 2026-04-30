@@ -3,13 +3,8 @@
 > Rank app opportunities globally — across 50+ markets, dual-store (Apple App Store + Google Play) — by localization gap, paywall complexity, estimated revenue, and Claude judges (text + vision).
 
 ```bash
-# After npm publish (lands in milestone M7):
+# Live on npm as of v0.6.0 (M7 — 2026-04-30):
 npx @apps-machine/selection-agent demo
-
-# Pre-publish (today): clone + run via Bun
-git clone https://github.com/apps-machine/selection-agent && cd selection-agent
-bun install
-bun src/cli/index.ts demo
 ```
 
 Zero config, no API key. ~30s to your first ranked brief from cached data.
