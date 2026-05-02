@@ -5,7 +5,7 @@ import type { ZodType } from "zod";
 import { assertDiskSpace, MIN_DISK_BYTES_DEFAULT } from "./disk.ts";
 import { JudgeResultStore } from "./judge-result-store.ts";
 import { SnapshotStore } from "./queries.ts";
-import { ALL_SCHEMAS } from "./schema.ts";
+import { ALL_SCHEMAS, runMigrations } from "./schema.ts";
 
 function ensureParentDir(path: string): void {
   mkdirSync(dirname(path), { recursive: true });
@@ -33,6 +33,7 @@ export class Cache {
     db.exec("PRAGMA journal_mode = WAL");
     db.exec("PRAGMA synchronous = NORMAL");
     for (const sql of ALL_SCHEMAS) db.exec(sql);
+    runMigrations(db);
     return new Cache(db, clock);
   }
 

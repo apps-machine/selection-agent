@@ -5,6 +5,66 @@ All notable changes to `@apps-machine/selection-agent` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-05-02
+
+Agent v1 foundation — Opportunity contract, 4-signal composer, backtest harness, and ground-truth pipeline. The selection-agent's primitive shifts from "ranked candidate list" (v0.7) to **structured Opportunity records** (v1) that flow through a leak-proof backtest pipeline.
+
+### Added
+
+- **Opportunity contract** (`src/opportunities/`) — new public Zod schema replacing the legacy composite scoring as the agent's primary output type. Three rings of fields: load-bearing (signal_values, predicted, kill_metric, actual_outcome, score, eligible) for backtest queries + outcome tracking; narrative (thesis prose + evidence URLs) for indie-maker reading; escape-hatch (`metadata`) for unproven fields that graduate into the contract once load-bearing across runs.
+- **4 ranker signals** with composer:
+  - `locGap` (existing M4 — text judge)
+  - `velocity` (extended for v1: `src/velocity/v1-score.ts` reads chart_snapshots, 30d-smoothing filter, top-200 scope, persists to signal_snapshots with versioning)
+  - `incumbent_vulnerability` (NEW: `src/signals/incumbent-vulnerability.ts` — deterministic, days_since_update + 90d rating trend; null when reviews missing)
+  - `cpi_ltv_proxy` (NEW: `src/signals/cpi-ltv-proxy.ts` + JSON seed for tier-2 SEA categories; family-fallback for unseen categories within the same market)
+- **Top-3 robust mean scoring** (`src/signals/composer.ts`) — `computeOpportunityScore(SignalValues)` returns `{ score, eligible }`. N<3 non-null signals returns `eligible: false` (Codex Round 2 #3 fix — no silent null-to-zero coercion).
+- **Mechanic evidence** as descriptive text-only via `vision-judge.generateMechanicEvidence` — qualitative LLM paragraph, persisted in `metadata.mechanic_evidence`. NOT scored in v1; v2 promotes to ranker if Cohen's kappa across Claude/GPT ≥ 0.6 on a 100-item taxonomy validates inter-rater reliability.
+- **Brief renderer** (`src/reporting/briefs.ts`) — replaced for the Opportunity contract via `renderBrief(opportunity, opts)`. LLM-generated thesis paragraph, full provenance persisted to signal_snapshots for backtest replay (Codex Round 2 #6). dryRun mode for offline tests/scripts.
+- **Pattern tags** derived post-computation: `tier2-localization`, `hot-wave`, `incumbent-toppling`. Null-safe (Codex Round 2 #5: every threshold check preceded by explicit `!= null` guard — `undefined > 7` silently evaluates false in JS).
+- **`runV1Pipeline()`** in `src/orchestrator/pipeline.ts` — composes ingestion (optional AppGoblin import + 42matters bulk-extract) → 4 signals → composer → mechanic_evidence → Opportunity assembly → brief render → persist. Missing 42matters API key warns + skips (does not throw).
+
+### Internal (NOT exported via npm)
+
+- `src/backtest/` — backtest harness with precision@K + lift over baselines (locGap_only, velocity_only) + leakage detection. The harness NEVER calls a live LLM (reads frozen rows from signal_snapshots).
+- `src/ground-truth/` — winner-score forward-looking formula, 42matters API client (gated on commercial trial), AppGoblin TSV.xz ETL (streamed decompress + transaction-batched inserts per Codex Round 2 #8), wayback-fetch (demoted to optional enrichment per Day 1 audit), llm-augment with Zod-enforced citation enforcement (no fabrication; missing URL → field stays null).
+- `src/signals/` — composer + 3 new signal implementations.
+- `src/opportunities/` — Opportunity Zod contract.
+- `src/orchestrator/cohort-freeze.ts` — sequencing primitive for backtest leakage prevention (Codex Round 2 #9). `freezeCohort()` captures (market, t0, app_ids); `getFrozenCohortFeatures()` reads ONLY pre-t0 rows AND throws on detection of any post-t0 leakage row.
+- `src/cli/` — `--internal` CLI subcommands `backtest`, `winner-score`, `opportunity` (gated from `files:` whitelist; verified by `tests/cli/internal-publish-boundary.test.ts` via `npm pack --dry-run`).
+- `scripts/run-first-backtest.ts` — synthetic-cohort smoke test that proves the harness works end-to-end before the real first backtest can run.
+
+### Changed
+
+- `src/scoring/composite.ts` — refactored to delegate to composer (top-3 robust mean replaces the v0.7 weighted-sum heuristic). Public `CompositeOutput` shape stable (`composite`, `breakdown`, `weights`); `weights` field repurposed from multipliers to participation flags.
+- `src/scoring/market-revenue-weight.ts` — addressed pre-existing Phase 1 TODO with three category presets (`subscription`, `games`, `ads`). Backwards-compatible aliases preserved (`MARKET_REVENUE_WEIGHT` → `SUBSCRIPTION_REVENUE_WEIGHT`, `DEFAULT_REVENUE_WEIGHT` → `DEFAULT_SUBSCRIPTION_WEIGHT`).
+- `src/judges/vision-judge.ts` — addressed pre-existing M6 TODO with `MIN_SCREENSHOTS_FOR_CONFIDENT_VERDICT` bumped to 3 (was 2). Centralized constant; `judgeAppVision` proceeds with thin signal but `generateMechanicEvidence` refuses below the threshold (qualitative prose grounded in 1-2 frames is hallucination bait).
+- `src/util/rate-limit.ts` — extended with `withCircuitBreaker(fn, threshold)`, `withExpBackoff(fn, maxAttempts)`, persisted SQLite-backed queue (Codex Round 2 #7 — process-crash-resumable). Existing per-host concurrency unchanged; M2 scrapers continue to pass.
+- `packages/selection-agent/package.json` `files:` field — explicit whitelist excludes internal modules (`src/backtest/`, `src/ground-truth/`, `src/opportunities/`, `src/signals/`, `scripts/`) from the public mirror via subtree-split. Codex Round 2 #10 enforcement.
+
+### Storage schema
+
+- 7 new tables via migration runner: `opportunities`, `winner_scores`, `signal_snapshots`, `chart_snapshots`, `app_metadata_snapshots`, `cohort_freezes`, `rate_limit_queue` (plus the meta `schema_migrations` ledger). All v1 signals persisted with `signal_pipeline_version` + `scoring_version` for backtest reproducibility (Codex Round 2 #6). Load-bearing signal columns are typed nullable REAL (Codex Round 2 #1 — JSON blob would block indexed queries).
+- All LLM calls persisted with full provenance (`llm_model` + `llm_prompt_version` + `llm_request_hash` + `llm_response_hash` + `llm_response_archived` + `source_urls_json`) so backtest replay reads frozen rows ONLY (no live LLM calls).
+
+### Tests
+
+- 715 tests pass (was 365 at v0.7.0). +350 tests across 22 new test files for v1 modules (composer, signals, ground-truth, backtest harness, cohort-freeze, internal CLI, integration E2E).
+- Critical regression tests: M2 scrapers continue to pass after the rate-limit extension.
+- Critical leakage test: `tests/orchestrator/cohort-freeze.test.ts` — `getFrozenCohortFeatures` throws when a post-t0 signal_snapshots row exists for a frozen app.
+- Critical citation rejection: `tests/ground-truth/llm-augment.test.ts` — Zod rejects LLM responses missing URL → field stays null (no fabrication).
+- Integration E2E: `tests/integration/full-pipeline.test.ts` (4) + `tests/integration/backtest-e2e.test.ts` (4) — full v1 flow on synthetic fixtures.
+
+### Strategic notes
+
+- Hybrid C path locked: apps-first stays primary; v1 agent rewrite ships in parallel as prototype (per `docs/planning/agent-v1-foundation.md`).
+- Day 1 audit: OSF + Wayback unviable for tier-2 SEA historical metadata. Pivoted to 42matters 14-day commercial trial + AppGoblin chart-rank time series.
+- Decision point at week 3-4: 2 apps' real ROAS vs v1 backtest precision determines apps-first vs agent-first SaaS pivot.
+- 7 codex Round 1 critiques deferred to v2 (mechanic_novelty taxonomy, missing analyst signals, hard gates, statistical rigor of decision gate, SaaS-specific kill criteria, SEA vs global strategic inconsistency, mechanic_evidence promotion). All 10 codex Round 2 critiques incorporated.
+
+### Real first backtest gating
+
+This release does NOT include the first real backtest report. The synthetic backtest (`scripts/run-first-backtest.ts` → `docs/planning/agent-v1-synthetic-backtest-results.md`) proves the harness works end-to-end. The REAL first backtest gates on user signing up for the 42matters 14-day trial; full prerequisite checklist in `docs/planning/agent-v1-real-backtest-checklist.md`.
+
 ## [0.7.1] - 2026-04-30
 
 CLI first-impression polish: branded banner now greets every user the moment they invoke the CLI, and the missing-API-key error is finally a copy-pasteable recipe instead of a broken hint.

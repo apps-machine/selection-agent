@@ -437,12 +437,113 @@ function shouldShowBanner(argv: string[]): boolean {
     const a = argv[i];
     if (a === "--format=json") return false;
     if (a === "--format" && argv[i + 1] === "json") return false;
+    // Hide banner on --internal as well; internal subcommands print
+    // structured output (JSON or markdown) that downstream tools may parse.
+    if (a === "--internal") return false;
   }
   return true;
 }
 
-if (shouldShowBanner(process.argv.slice(2))) {
+/**
+ * Gate internal subcommands behind --internal flag.
+ *
+ * Why a runtime gate instead of a citty subCommands group: the public CLI's
+ * --help screen MUST NOT list backtest/winner-score/opportunity, because
+ * (a) they don't ship to npm consumers and (b) accidental discovery would
+ * lead users to error paths.
+ *
+ * The internal CLI module lives at `src/backtest/cli.ts`, which is NOT in
+ * package.json `files:` whitelist (verified by
+ * tests/cli/internal-publish-boundary.test.ts via npm pack --dry-run).
+ * Dynamic import means the production npm tarball never even references
+ * the path; the import only resolves in dev/founder runs where the full
+ * source tree is present.
+ */
+async function maybeRunInternal(argv: string[]): Promise<boolean> {
+  const internalIdx = argv.indexOf("--internal");
+  if (internalIdx === -1) return false;
+  // Strip --internal from argv so the inner runMain sees a clean argv where
+  // the subcommand is the next positional.
+  const innerArgv = [...argv.slice(0, internalIdx), ...argv.slice(internalIdx + 1)];
+  const subName = innerArgv[0];
+  if (typeof subName !== "string" || subName.length === 0) {
+    process.stderr.write(
+      `${formatError({
+        code: "INTERNAL_SUBCOMMAND_REQUIRED",
+        message: "--internal requires a subcommand",
+        cause: "No subcommand was passed after --internal.",
+        fix: "rerun with one of: --internal backtest, --internal winner-score, --internal opportunity",
+        docs: "docs/planning/agent-v1-foundation.md § Internal CLI subcommands",
+      })}\n`,
+    );
+    process.exit(2);
+    return true;
+  }
+  let internalModule: typeof import("../backtest/cli.ts");
+  try {
+    internalModule = await import("../backtest/cli.ts");
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    process.stderr.write(
+      `${formatError({
+        code: "INTERNAL_MODULE_MISSING",
+        message: `failed to load internal CLI module: ${message}`,
+        cause:
+          "src/backtest/cli.ts is not present in the published npm tarball — internal subcommands are dev/founder-only.",
+        fix: "Run from the apps-machine/studio source tree (not from the published @apps-machine/selection-agent package).",
+        docs: "docs/planning/agent-v1-foundation.md § Internal CLI subcommands",
+      })}\n`,
+    );
+    process.exit(1);
+    return true;
+  }
+  const sub = internalModule.INTERNAL_SUBCOMMANDS[subName];
+  if (!sub) {
+    process.stderr.write(
+      `${formatError({
+        code: "UNKNOWN_INTERNAL_SUBCOMMAND",
+        message: `unknown internal subcommand "${subName}"`,
+        cause: "Subcommand not in INTERNAL_SUBCOMMANDS dispatch table.",
+        fix: `accepted: ${Object.keys(internalModule.INTERNAL_SUBCOMMANDS).join(", ")}`,
+        docs: "docs/planning/agent-v1-foundation.md § Internal CLI subcommands",
+      })}\n`,
+    );
+    process.exit(2);
+    return true;
+  }
+  // Build a wrapper command that nests the chosen subcommand. citty's runMain
+  // expects a top-level command; nesting via subCommands gives consistent
+  // arg parsing + --help text.
+  const wrapper = defineCommand({
+    meta: { name: "selection-agent --internal", version: VERSION },
+    subCommands: { [subName]: sub },
+  });
+  // Override process.argv so citty parses just the inner subcommand line.
+  const original = process.argv;
+  process.argv = [original[0] ?? "bun", original[1] ?? "selection-agent", ...innerArgv];
+  try {
+    await runMain(wrapper);
+  } finally {
+    process.argv = original;
+  }
+  return true;
+}
+
+const argv = process.argv.slice(2);
+if (shouldShowBanner(argv)) {
   process.stdout.write(renderBanner());
 }
 
-runMain(main);
+// Hot-path optimization + race avoidance: when --internal is NOT present,
+// invoke runMain synchronously (it returns a Promise but citty installs its
+// own process.exit handler so we don't need to await). When --internal IS
+// present, we MUST await the dynamic import in maybeRunInternal before the
+// dispatch can occur. The two paths intentionally diverge so the citty hot
+// path stays exactly as it was before this gate was added — preserving the
+// existing test suite's runtime behavior (including --help under spawnSync).
+if (argv.includes("--internal")) {
+  // Async path — top-level await keeps process alive for the dynamic import.
+  await maybeRunInternal(argv);
+} else {
+  runMain(main);
+}

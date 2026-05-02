@@ -1,6 +1,6 @@
 {
   "name": "@apps-machine/selection-agent",
-  "version": "0.7.1",
+  "version": "0.8.0",
   "description": "Apps Machine — Selection Agent. Ranks app opportunities globally via dual-store (Apple App Store + Google Play) scraping, heuristic scoring, and Claude judges. Run `npx @apps-machine/selection-agent demo` for a 30s magical moment.",
   "type": "module",
   "bin": {
@@ -8,7 +8,17 @@
   },
   "main": "./src/cli/index.ts",
   "files": [
-    "src",
+    "src/cli",
+    "src/scrapers",
+    "src/judges",
+    "src/scoring",
+    "src/storage",
+    "src/orchestrator",
+    "src/reporting",
+    "src/types",
+    "src/util",
+    "src/velocity",
+    "src/demo",
     "LICENSE",
     "README.md"
   ],

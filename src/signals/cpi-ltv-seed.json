@@ -1,0 +1,251 @@
+{
+  "version": "v1.0.0-seed",
+  "_comment": "Manual CPI/LTV estimates per (market, category) for tier-2 SEA markets. Sources: Liftoff Mobile App Trends 2024, AppsFlyer State of App Marketing SEA 2024, Adjust mobile benchmarks 2023-2024, Sensor Tower SEA reports. Numbers are USD. CPI is install cost; LTV is 12-month revenue per install (subscription/utility apps, not games). Ranges express uncertainty — true value sits inside the band ~70% of the time. v1 seed focuses on subscription/productivity/health niches the agent recommends; games + ad-monetized categories will land in v2 once we have first-app data per market. Markets covered: id, vn, th, my, ph, bd. Categories per market: health, productivity, finance, lifestyle, social. 30 entries total.",
+  "estimates": [
+    {
+      "market": "id",
+      "category": "health",
+      "cpi_low": 0.3,
+      "cpi_high": 0.8,
+      "ltv_low": 3.5,
+      "ltv_high": 8.0
+    },
+    {
+      "market": "id",
+      "category": "productivity",
+      "cpi_low": 0.4,
+      "cpi_high": 1.0,
+      "ltv_low": 4.0,
+      "ltv_high": 9.0
+    },
+    {
+      "market": "id",
+      "category": "finance",
+      "cpi_low": 0.6,
+      "cpi_high": 1.5,
+      "ltv_low": 6.0,
+      "ltv_high": 18.0
+    },
+    {
+      "market": "id",
+      "category": "lifestyle",
+      "cpi_low": 0.25,
+      "cpi_high": 0.7,
+      "ltv_low": 2.5,
+      "ltv_high": 6.5
+    },
+    {
+      "market": "id",
+      "category": "social",
+      "cpi_low": 0.35,
+      "cpi_high": 0.9,
+      "ltv_low": 1.2,
+      "ltv_high": 4.0
+    },
+
+    {
+      "market": "vn",
+      "category": "health",
+      "cpi_low": 0.25,
+      "cpi_high": 0.7,
+      "ltv_low": 3.0,
+      "ltv_high": 7.5
+    },
+    {
+      "market": "vn",
+      "category": "productivity",
+      "cpi_low": 0.35,
+      "cpi_high": 0.9,
+      "ltv_low": 3.5,
+      "ltv_high": 8.5
+    },
+    {
+      "market": "vn",
+      "category": "finance",
+      "cpi_low": 0.55,
+      "cpi_high": 1.4,
+      "ltv_low": 5.5,
+      "ltv_high": 16.0
+    },
+    {
+      "market": "vn",
+      "category": "lifestyle",
+      "cpi_low": 0.2,
+      "cpi_high": 0.6,
+      "ltv_low": 2.2,
+      "ltv_high": 5.5
+    },
+    {
+      "market": "vn",
+      "category": "social",
+      "cpi_low": 0.3,
+      "cpi_high": 0.8,
+      "ltv_low": 1.0,
+      "ltv_high": 3.5
+    },
+
+    {
+      "market": "th",
+      "category": "health",
+      "cpi_low": 0.4,
+      "cpi_high": 1.0,
+      "ltv_low": 4.5,
+      "ltv_high": 9.5
+    },
+    {
+      "market": "th",
+      "category": "productivity",
+      "cpi_low": 0.5,
+      "cpi_high": 1.2,
+      "ltv_low": 5.0,
+      "ltv_high": 11.0
+    },
+    {
+      "market": "th",
+      "category": "finance",
+      "cpi_low": 0.7,
+      "cpi_high": 1.8,
+      "ltv_low": 7.5,
+      "ltv_high": 20.0
+    },
+    {
+      "market": "th",
+      "category": "lifestyle",
+      "cpi_low": 0.3,
+      "cpi_high": 0.85,
+      "ltv_low": 3.0,
+      "ltv_high": 7.5
+    },
+    {
+      "market": "th",
+      "category": "social",
+      "cpi_low": 0.45,
+      "cpi_high": 1.1,
+      "ltv_low": 1.5,
+      "ltv_high": 4.5
+    },
+
+    {
+      "market": "my",
+      "category": "health",
+      "cpi_low": 0.45,
+      "cpi_high": 1.1,
+      "ltv_low": 5.0,
+      "ltv_high": 10.5
+    },
+    {
+      "market": "my",
+      "category": "productivity",
+      "cpi_low": 0.55,
+      "cpi_high": 1.3,
+      "ltv_low": 5.5,
+      "ltv_high": 12.0
+    },
+    {
+      "market": "my",
+      "category": "finance",
+      "cpi_low": 0.8,
+      "cpi_high": 2.0,
+      "ltv_low": 8.5,
+      "ltv_high": 22.0
+    },
+    {
+      "market": "my",
+      "category": "lifestyle",
+      "cpi_low": 0.35,
+      "cpi_high": 0.95,
+      "ltv_low": 3.5,
+      "ltv_high": 8.0
+    },
+    {
+      "market": "my",
+      "category": "social",
+      "cpi_low": 0.5,
+      "cpi_high": 1.2,
+      "ltv_low": 1.8,
+      "ltv_high": 5.0
+    },
+
+    {
+      "market": "ph",
+      "category": "health",
+      "cpi_low": 0.3,
+      "cpi_high": 0.8,
+      "ltv_low": 3.0,
+      "ltv_high": 7.0
+    },
+    {
+      "market": "ph",
+      "category": "productivity",
+      "cpi_low": 0.35,
+      "cpi_high": 0.95,
+      "ltv_low": 3.5,
+      "ltv_high": 8.0
+    },
+    {
+      "market": "ph",
+      "category": "finance",
+      "cpi_low": 0.5,
+      "cpi_high": 1.3,
+      "ltv_low": 5.0,
+      "ltv_high": 14.0
+    },
+    {
+      "market": "ph",
+      "category": "lifestyle",
+      "cpi_low": 0.22,
+      "cpi_high": 0.65,
+      "ltv_low": 2.2,
+      "ltv_high": 5.5
+    },
+    {
+      "market": "ph",
+      "category": "social",
+      "cpi_low": 0.3,
+      "cpi_high": 0.8,
+      "ltv_low": 1.1,
+      "ltv_high": 3.5
+    },
+
+    {
+      "market": "bd",
+      "category": "health",
+      "cpi_low": 0.18,
+      "cpi_high": 0.55,
+      "ltv_low": 2.0,
+      "ltv_high": 5.5
+    },
+    {
+      "market": "bd",
+      "category": "productivity",
+      "cpi_low": 0.22,
+      "cpi_high": 0.65,
+      "ltv_low": 2.5,
+      "ltv_high": 6.0
+    },
+    {
+      "market": "bd",
+      "category": "finance",
+      "cpi_low": 0.4,
+      "cpi_high": 1.1,
+      "ltv_low": 4.5,
+      "ltv_high": 13.0
+    },
+    {
+      "market": "bd",
+      "category": "lifestyle",
+      "cpi_low": 0.15,
+      "cpi_high": 0.5,
+      "ltv_low": 1.8,
+      "ltv_high": 4.5
+    },
+    {
+      "market": "bd",
+      "category": "social",
+      "cpi_low": 0.25,
+      "cpi_high": 0.7,
+      "ltv_low": 0.9,
+      "ltv_high": 3.0
+    }
+  ]
+}

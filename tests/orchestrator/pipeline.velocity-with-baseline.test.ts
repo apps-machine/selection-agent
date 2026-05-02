@@ -13,7 +13,7 @@ describe("runScan — velocity activates with 14d baseline", () => {
   });
   afterEach(() => cache.close());
 
-  test("with 14 prior snapshots, composite uses WEIGHTS_WITH_VELOCITY", async () => {
+  test("with 14 prior snapshots, composite participates velocity (eligible + flag set)", async () => {
     const seedApp: RawAppData = {
       store: "apple",
       appId: "us.app1",
@@ -76,7 +76,10 @@ describe("runScan — velocity activates with 14d baseline", () => {
 
     expect(result.candidates).toHaveLength(1);
     const c = result.candidates[0];
+    // v1: weights.velocity is now a participation flag (1 = velocity
+    // contributed, 0 = absent), not the legacy 0.25 multiplier weight.
     expect(c?.composite.breakdown.velocity).not.toBeNull();
-    expect(c?.composite.weights.velocity).toBe(0.25);
+    expect(c?.composite.weights.velocity).toBe(1);
+    expect(c?.composite.eligible).toBe(true);
   });
 });

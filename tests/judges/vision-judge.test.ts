@@ -1,9 +1,13 @@
+import { Database } from "bun:sqlite";
 import { describe, expect, test } from "bun:test";
 import {
+  generateMechanicEvidence,
   type ImageFetcher,
   judgeAppVision,
+  MIN_SCREENSHOTS_FOR_CONFIDENT_VERDICT,
   type VisionJudgeClient,
 } from "../../src/judges/vision-judge.ts";
+import { runMigrations } from "../../src/storage/schema.ts";
 import type { RawAppData } from "../../src/types/raw-app-data.ts";
 import { isErr, isOk } from "../../src/util/result.ts";
 
@@ -315,5 +319,231 @@ describe("judgeAppVision", () => {
     expect(captured).not.toBeNull();
     expect(captured!.input).toBe(1500);
     expect(captured!.output).toBe(80);
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────
+// MIN_SCREENSHOTS_FOR_CONFIDENT_VERDICT — applied uniformly (M6 TODO resolved)
+// ──────────────────────────────────────────────────────────────────────
+
+describe("MIN_SCREENSHOTS_FOR_CONFIDENT_VERDICT — TODO at line 219 resolved", () => {
+  test("constant is 3 (bumped from 2 during v1 mechanic_evidence work)", () => {
+    expect(MIN_SCREENSHOTS_FOR_CONFIDENT_VERDICT).toBe(3);
+  });
+
+  test("judgeAppVision still returns ok with fewer screenshots (thin verdict allowed)", async () => {
+    // The cultural-fit signal still proceeds below threshold — orchestrator
+    // down-weights confidence using screenshotsAnalyzed. Refusing entirely
+    // would erase the only cultural-fit signal we have for sparse apps.
+    const thinApp = {
+      ...sampleApp,
+      screenshotUrls: ["https://example.com/only.png"],
+    };
+    const { client } = makeMockClient([{ kind: "ok", toolInput: validToolInput }]);
+    const fetcher = fetcherWith({
+      "https://example.com/only.png": { mediaType: "image/png", base64: "AAA" },
+    });
+    const result = await judgeAppVision({ app: thinApp, client, fetchImage: fetcher });
+    expect(isOk(result)).toBe(true);
+    if (!result.ok) throw new Error("unreachable");
+    expect(result.value.screenshotsAnalyzed).toBe(1); // < MIN, but still ok
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────
+// generateMechanicEvidence — qualitative prose for v1 metadata.mechanic_evidence
+// ──────────────────────────────────────────────────────────────────────
+
+function makeMechanicClient(
+  responses: Array<{ kind: "ok"; text: string } | { kind: "throw"; error: unknown }>,
+): VisionJudgeClient {
+  let idx = 0;
+  return {
+    messages: {
+      create: async () => {
+        const r = responses[idx];
+        idx += 1;
+        if (!r) throw new Error(`no mock response at idx ${idx - 1}`);
+        if (r.kind === "throw") throw r.error;
+        return {
+          id: "msg",
+          type: "message",
+          role: "assistant",
+          content: [{ type: "text", text: r.text }],
+          stop_reason: "end_turn",
+          usage: { input_tokens: 200, output_tokens: 60 },
+        };
+      },
+    },
+  };
+}
+
+describe("generateMechanicEvidence", () => {
+  test("returns null when fewer than MIN_SCREENSHOTS_FOR_CONFIDENT_VERDICT", async () => {
+    const client = makeMechanicClient([
+      { kind: "throw", error: new Error("must NOT call LLM below threshold") },
+    ]);
+    const result = await generateMechanicEvidence(
+      {
+        appId: "com.x.y",
+        name: "X",
+        description: "desc",
+        screenshotUrls: ["https://e.com/a.png", "https://e.com/b.png"], // 2 < 3
+      },
+      {
+        client,
+        fetchImage: async () => ({ mediaType: "image/png", base64: "AA" }),
+      },
+    );
+    expect(result.evidence).toBeNull();
+    expect(result.screenshots_analyzed).toBe(0);
+    expect(result.request_hash).toBe("");
+    expect(result.response_hash).toBe("");
+  });
+
+  test("returns paragraph when ≥3 screenshots fetched successfully", async () => {
+    const client = makeMechanicClient([
+      {
+        kind: "ok",
+        text: "Core loop: scan barcode → log calories. Novel mechanic: gamified streak rewards.",
+      },
+    ]);
+    const result = await generateMechanicEvidence(
+      {
+        appId: "com.x.y",
+        name: "X",
+        description: "Calorie tracker.",
+        screenshotUrls: ["https://e.com/a.png", "https://e.com/b.png", "https://e.com/c.png"],
+      },
+      {
+        client,
+        fetchImage: async () => ({ mediaType: "image/png", base64: "AAAA" }),
+      },
+    );
+    expect(result.evidence).toContain("Core loop");
+    expect(result.evidence).toContain("Novel mechanic");
+    expect(result.screenshots_analyzed).toBe(3);
+    expect(result.request_hash).toMatch(/^[a-f0-9]{64}$/);
+    expect(result.response_hash).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  test("re-checks threshold AFTER fetch: partial CDN failure drops below MIN → null", async () => {
+    const client = makeMechanicClient([
+      { kind: "throw", error: new Error("must NOT call LLM below threshold") },
+    ]);
+    let i = 0;
+    const fetcher: ImageFetcher = async () => {
+      i += 1;
+      if (i === 1) return { mediaType: "image/png", base64: "AA" };
+      throw new Error(`CDN fail ${i}`);
+    };
+    const result = await generateMechanicEvidence(
+      {
+        appId: "com.x.y",
+        name: "X",
+        description: "desc",
+        screenshotUrls: ["https://e.com/a.png", "https://e.com/b.png", "https://e.com/c.png"],
+      },
+      { client, fetchImage: fetcher },
+    );
+    expect(result.evidence).toBeNull();
+    expect(result.screenshots_analyzed).toBe(1); // 1 < 3 after CDN failures
+  });
+
+  test("persists to signal_snapshots with full provenance", async () => {
+    const db = new Database(":memory:");
+    runMigrations(db);
+    const client = makeMechanicClient([{ kind: "ok", text: "Generated mechanic paragraph." }]);
+    const t = 1_700_000_000_000;
+    await generateMechanicEvidence(
+      {
+        appId: "com.persist.test",
+        name: "Persist",
+        description: "A persistence test.",
+        screenshotUrls: ["https://e.com/a.png", "https://e.com/b.png", "https://e.com/c.png"],
+      },
+      {
+        client,
+        fetchImage: async () => ({ mediaType: "image/png", base64: "AAAA" }),
+        persist: { db, t },
+        clock: () => 1_700_000_005_000,
+      },
+    );
+
+    const row = db
+      .prepare<
+        {
+          app_id: string;
+          signal_name: string;
+          t: number;
+          value: number | null;
+          llm_model: string;
+          llm_prompt_version: string;
+          llm_request_hash: string;
+          llm_response_hash: string;
+          llm_response_archived: string;
+          source_urls_json: string;
+          computed_at: number;
+        },
+        []
+      >("SELECT * FROM signal_snapshots WHERE signal_name = 'mechanic_evidence'")
+      .get();
+    expect(row).not.toBeNull();
+    if (!row) throw new Error("unreachable");
+    expect(row.app_id).toBe("com.persist.test");
+    expect(row.signal_name).toBe("mechanic_evidence");
+    expect(row.t).toBe(t);
+    expect(row.value).toBeNull(); // text, not numeric
+    expect(row.llm_model).toBe("claude-opus-4-7");
+    expect(row.llm_prompt_version).toBe("v1.0.0");
+    expect(row.llm_response_archived).toBe("Generated mechanic paragraph.");
+    expect(row.source_urls_json).toBe("[]");
+    expect(row.computed_at).toBe(1_700_000_005_000);
+  });
+
+  test("does NOT persist when below threshold (no useful row to archive)", async () => {
+    const db = new Database(":memory:");
+    runMigrations(db);
+    const client = makeMechanicClient([
+      { kind: "throw", error: new Error("must NOT call LLM below threshold") },
+    ]);
+    await generateMechanicEvidence(
+      {
+        appId: "com.x.y",
+        name: "X",
+        description: "desc",
+        screenshotUrls: ["https://e.com/a.png"], // 1 < 3
+      },
+      {
+        client,
+        fetchImage: async () => ({ mediaType: "image/png", base64: "AA" }),
+        persist: { db, t: 0 },
+      },
+    );
+    const count = db
+      .prepare<{ n: number }, []>(
+        "SELECT COUNT(*) AS n FROM signal_snapshots WHERE signal_name = 'mechanic_evidence'",
+      )
+      .get();
+    expect(count?.n ?? 0).toBe(0);
+  });
+
+  test("LLM throws → returns null evidence, does not crash", async () => {
+    const client = makeMechanicClient([{ kind: "throw", error: new Error("API down") }]);
+    const result = await generateMechanicEvidence(
+      {
+        appId: "com.x.y",
+        name: "X",
+        description: "desc",
+        screenshotUrls: ["https://e.com/a.png", "https://e.com/b.png", "https://e.com/c.png"],
+      },
+      {
+        client,
+        fetchImage: async () => ({ mediaType: "image/png", base64: "AA" }),
+        retry: { initialDelayMs: 1, maxDelayMs: 4, jitter: false, maxAttempts: 1 },
+      },
+    );
+    expect(result.evidence).toBeNull();
+    expect(result.request_hash).not.toBe(""); // hash known even on call failure
   });
 });

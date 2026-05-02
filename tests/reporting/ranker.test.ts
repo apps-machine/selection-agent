@@ -84,6 +84,7 @@ function candidate(args: {
     }),
     composite: {
       composite: args.composite,
+      eligible: true,
       breakdown: { locGap: 0, revenue: 0, paywall: 0, velocity: null },
       weights: { locGap: 0.4, revenue: 0.4, paywall: 0.2, velocity: 0 },
     },

@@ -1,3 +1,4 @@
+import type { Opportunity } from "../../src/opportunities/schema.ts";
 import type { RankedCandidate, ScanResult } from "../../src/orchestrator/types.ts";
 
 export function fixedScanResult(): ScanResult {
@@ -26,6 +27,7 @@ export function fixedScanResult(): ScanResult {
       },
       composite: {
         composite: 8.2,
+        eligible: true,
         breakdown: { locGap: 9.0, revenue: 8.5, paywall: 6.5, velocity: null },
         weights: { locGap: 0.4, revenue: 0.4, paywall: 0.2, velocity: 0 },
       },
@@ -88,6 +90,7 @@ export function fixedScanResult(): ScanResult {
       },
       composite: {
         composite: 6.4,
+        eligible: true,
         breakdown: { locGap: 5.5, revenue: 7.0, paywall: 6.5, velocity: 6.0 },
         weights: { locGap: 0.3, revenue: 0.3, paywall: 0.15, velocity: 0.25 },
       },
@@ -124,4 +127,66 @@ export function fixedScanResult(): ScanResult {
     enrichmentFailedCount: 1,
     enrichmentSkipped: false,
   };
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// v1 Opportunity fixtures (renderBrief consumers)
+// ──────────────────────────────────────────────────────────────────────
+
+/**
+ * Canonical "happy path" Opportunity: all 4 v1 signals populated, full
+ * predicted economics, mechanic_evidence in metadata, multiple citations.
+ * Targets a tier-2 market (id) so the tier2-localization tag fires.
+ *
+ * Tweak via the optional `overrides` argument to exercise null-safety paths
+ * without re-declaring the whole shape.
+ */
+export function fixedOpportunity(overrides: Partial<Opportunity> = {}): Opportunity {
+  const base: Opportunity = {
+    id: "11111111-1111-1111-1111-111111111111",
+    generated_at: "2026-04-29T12:00:00.000Z",
+    source_app_id: "com.example.calai",
+    source_market: "us",
+    target_market: "id",
+    category: "health",
+    signal_values: {
+      locGap: 8.5,
+      velocity: 6.0,
+      incumbent_vulnerability: 7.5,
+      cpi_ltv_proxy: 7.0,
+    },
+    predicted: {
+      cpi_low: 0.5,
+      cpi_high: 1.5,
+      ltv_low: 4,
+      ltv_high: 12,
+      validation_budget_usd: 500,
+    },
+    kill_metric: {
+      metric: "roas_d14",
+      threshold: 0.4,
+      direction: "below",
+    },
+    score: 7.7,
+    eligible: true,
+    thesis:
+      "Cal AI dominates US calorie tracking but ships English-only in Indonesia where Bahasa Indonesia + GoPay/OVO are table stakes — the localized clone wins on rails the incumbent can't run.",
+    evidence: [
+      {
+        url: "https://apps.apple.com/id/app/cal-ai/id1234567890",
+        claim: "Cal AI listing on the Indonesian App Store has no Bahasa translation.",
+      },
+      {
+        url: "https://www.indiehackers.com/post/cal-ai-mrr-300k",
+        claim: "IndieHackers thread reports Cal AI at $300k MRR globally.",
+      },
+    ],
+    metadata: {
+      signal_pipeline_version: "v1.0.0",
+      scoring_version: "v1.0.0",
+      mechanic_evidence:
+        "Core loop: photograph meal → AI estimates calories → log to daily target. Novel mechanic: portion-size calibration via on-screen reference object instead of manual gram entry.",
+    },
+  };
+  return { ...base, ...overrides };
 }
