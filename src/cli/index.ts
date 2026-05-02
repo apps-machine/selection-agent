@@ -296,13 +296,18 @@ const main = defineCommand({
       meta: {
         name: "snapshot",
         description:
-          "Daily Track B snapshot writer. Scrapes top-grossing across the 6 Phase 0 markets on both stores and persists one row per app per UTC day. Cron-friendly: scrape-only, no LLM calls.",
+          "Daily Track B snapshot writer. Scrapes top-grossing across the default tier-2 SEA cluster on both stores and persists one row per app per UTC day. Cron-friendly: scrape-only, no LLM calls.",
       },
       args: {
         limit: {
           type: "string",
           description: "Apps to capture per market+store",
           default: "100",
+        },
+        markets: {
+          type: "string",
+          description:
+            "Comma-separated ISO alpha-2 market codes (default: bd,th,vn,my,id — tier-2 SEA cluster, matches scan default since v0.7.0)",
         },
         db: {
           type: "string",
@@ -325,12 +330,28 @@ const main = defineCommand({
           );
           process.exit(2);
         }
+        let markets: string[] | undefined;
+        try {
+          markets = parseList(args.markets);
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          console.error(
+            formatError({
+              code: "INVALID_MARKETS",
+              message,
+              cause: "--markets must be a comma-separated list of ISO alpha-2 codes.",
+              fix: "rerun with --markets bd,th,vn,my,id (default) or another cluster",
+              docs: "https://github.com/apps-machine/selection-agent#commands",
+            }),
+          );
+          process.exit(2);
+        }
         const dbPath =
           (typeof args.db === "string" && args.db) ||
           process.env.SELECTION_AGENT_DB ||
           "./.cache/selection-agent.sqlite";
         try {
-          const result = await runSnapshot({ dbPath, limit });
+          const result = await runSnapshot({ dbPath, limit, markets });
           process.stdout.write(
             `Snapshot written for ${result.day}: ${result.written} new, ${result.skipped} already present.\n`,
           );

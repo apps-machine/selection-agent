@@ -5,6 +5,51 @@ All notable changes to `@apps-machine/selection-agent` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.1] - 2026-05-02
+
+Forward-collection fix. Closes a v0.7.0 oversight discovered during agent v1 build.
+
+### Fixed
+
+- `snapshot` CLI default markets pivoted from the legacy Phase 0 tier-1
+  cluster (`us, jp, de, fr, br, es`) to the tier-2 SEA cluster
+  (`bd, th, vn, my, id`) where the locGap thesis is empirically alive
+  per `m7.5-thesis-validation.md`. v0.7.0 pivoted `scan`'s
+  `DEFAULT_MARKETS` but missed the snapshot path; the daily Track-B
+  forward-collection cron was silently writing tier-1 ranks instead of
+  the tier-2 cohort the v1 backtest plan needs.
+
+### Added
+
+- `snapshot` CLI now accepts `--markets <comma,sep,iso>` (matches
+  `scan` flag shape). Override the default cluster without editing
+  source. INVALID_MARKETS error surface with explicit fix hint.
+- `forward-collection/` setup helpers in
+  `packages/selection-agent/scripts/forward-collection/` — daily macOS
+  launchd cron + plist template + setup script. One-command install of
+  the daily forward-snapshot writer to `~/.appsmachine/charts.db`. See
+  the directory's README for install / verify / uninstall.
+
+### Internal
+
+- `PHASE_0_MARKETS` constant in `src/velocity/run-snapshot.ts` renamed
+  to `DEFAULT_SNAPSHOT_MARKETS` and pivoted to tier-2 SEA. Matches the
+  `scan` default since v0.7.0.
+- `PHASE_0_STORES` renamed to `DEFAULT_SNAPSHOT_STORES` (apple + google
+  unchanged).
+
+### Notes
+
+- Background context: 42matters' "14-day trial" turned out to be a UI
+  demo rather than an API trial. The v1 ground-truth pipeline therefore
+  pivoted from "fallback to 42matters for historical metadata" to
+  **path A + B**: validate v1 via real ROAS on shipped apps (path A,
+  Hybrid C apps-first stays primary), and start collecting our own
+  forward time-series TODAY (path B — this v0.8.1 ships the cron).
+  Real backtest cohort becomes available at +6 months on accumulated
+  data we own. Zero commercial dependency. See
+  `docs/planning/agent-v1-foundation.md` for the full revised plan.
+
 ## [0.8.0] - 2026-05-02
 
 Agent v1 foundation — Opportunity contract, 4-signal composer, backtest harness, and ground-truth pipeline. The selection-agent's primitive shifts from "ranked candidate list" (v0.7) to **structured Opportunity records** (v1) that flow through a leak-proof backtest pipeline.

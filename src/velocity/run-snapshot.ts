@@ -6,9 +6,15 @@ import { Cache } from "../storage/cache.ts";
 import type { RawAppData, Store } from "../types/raw-app-data.ts";
 import { writeSnapshot } from "./snapshot.ts";
 
-/** 6 Phase 0 markets, founder-confirmed in `evals/fixtures/lang-targets.json`. */
-const PHASE_0_MARKETS = ["us", "jp", "de", "fr", "br", "es"] as const;
-const PHASE_0_STORES: readonly Store[] = ["apple", "google"];
+/**
+ * Tier-2 SEA cluster where the locGap thesis is empirically alive
+ * (see m7.5-thesis-validation.md). Pivoted from the legacy Phase 0
+ * tier-1 set (`us, jp, de, fr, br, es`) in v0.8.1 to match the scan
+ * default updated in v0.7.0. Override with `--markets` to collect
+ * a different cluster.
+ */
+const DEFAULT_SNAPSHOT_MARKETS = ["bd", "th", "vn", "my", "id"] as const;
+const DEFAULT_SNAPSHOT_STORES: readonly Store[] = ["apple", "google"];
 
 const ONE_HOUR_SECONDS = 60 * 60;
 
@@ -21,7 +27,7 @@ export interface RunSnapshotOpts {
   clients?: { apple: ScraperLib; google: ScraperLib };
   /** Override for tests; defaults to today UTC `YYYY-MM-DD`. */
   snapshotDay?: string;
-  /** Override for tests; defaults to the 6 Phase 0 markets. */
+  /** Markets to snapshot; defaults to the 5 tier-2 SEA markets (DEFAULT_SNAPSHOT_MARKETS). */
   markets?: readonly string[];
 }
 
@@ -38,8 +44,9 @@ function rankKey(app: RawAppData): string {
 }
 
 /**
- * Scrapes the top-grossing chart for the 6 Phase 0 markets on both
- * stores and writes one snapshot row per app per UTC day. Idempotent
+ * Scrapes the top-grossing chart for the default tier-2 SEA markets
+ * on both stores and writes one snapshot row per app per UTC day.
+ * Override `opts.markets` to collect a different cluster. Idempotent
  * via the `app_snapshot` UNIQUE constraint — re-running on the same
  * day re-uses scrape-cache (1 h TTL) and is mostly a no-op against
  * SQLite.
@@ -57,10 +64,10 @@ export async function runSnapshot(opts: RunSnapshotOpts): Promise<RunSnapshotRes
       ]);
       clients = { apple, google };
     }
-    const markets = opts.markets ?? PHASE_0_MARKETS;
+    const markets = opts.markets ?? DEFAULT_SNAPSHOT_MARKETS;
 
     const jobs: ChartScrapeJob[] = [];
-    for (const store of PHASE_0_STORES) {
+    for (const store of DEFAULT_SNAPSHOT_STORES) {
       for (const market of markets) {
         jobs.push({ store, market, collection: "top-grossing", limit: opts.limit });
       }

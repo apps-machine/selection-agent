@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.appsmachine.rss-snapshot</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>__BUN_BIN__:__NODE_BIN__:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin</string>
+        <key>HOME</key>
+        <string>__HOME__</string>
+    </dict>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>-lc</string>
+        <string>cd "$HOME/.appsmachine" &amp;&amp; SELECTION_AGENT_DB="$HOME/.appsmachine/charts.db" npx -y @apps-machine/selection-agent@latest snapshot --markets bd,th,vn,my,id --limit 200</string>
+    </array>
+
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>2</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>__HOME__/Library/Logs/com.appsmachine.rss-snapshot.out.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>__HOME__/Library/Logs/com.appsmachine.rss-snapshot.err.log</string>
+
+    <key>WorkingDirectory</key>
+    <string>__HOME__/.appsmachine</string>
+
+    <key>RunAtLoad</key>
+    <false/>
+</dict>
+</plist>
