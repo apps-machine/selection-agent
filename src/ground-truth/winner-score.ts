@@ -33,6 +33,11 @@
  */
 
 import type { Database } from "bun:sqlite";
+import {
+  computeChartRankStdDev,
+  NINETY_DAYS_MS,
+  normalizeStabilityRetention,
+} from "../signals/rank-stability.ts";
 
 /** Bumped on any formula change (weights, normalization caps, tier boundaries). */
 export const WINNER_SCORE_FORMULA_VERSION = "v1.0.0";
@@ -56,16 +61,16 @@ export const REVIEW_GROWTH_CAP = 1000;
 export const REVENUE_CAP_USD = 100_000;
 
 /**
- * Chart stability normalizer: standard deviation of daily rank over the
- * 90-day measurement window. A perfectly stable rank (sd=0) maps to 1.0;
- * a wildly oscillating rank (sd >= STABILITY_SD_BREAKEVEN) maps to 0.
- * Linear interpolation between.
+ * Chart stability normalizer constant — re-exported from ../signals/rank-stability
+ * for backward compatibility. The shared module defines the canonical value
+ * used by both retention-proxy (winner-score) and incumbent-vulnerability
+ * (Task 5 chart-stability fallback) so a calibration bump retunes both in
+ * lockstep.
  */
-export const STABILITY_SD_BREAKEVEN = 50;
+export { STABILITY_SD_BREAKEVEN } from "../signals/rank-stability.ts";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const MONTH_MS = 30 * DAY_MS;
-const NINETY_DAYS_MS = 90 * DAY_MS;
 
 export type WinnerTier = "winner" | "marginal" | "loser";
 
@@ -121,7 +126,7 @@ export function computeWinnerScore(
     0.4 * normalizeMonthsTop100(monthsTop100) +
     0.3 * normalizeReviewGrowth(reviewGrowth) +
     0.2 * normalizeRevenue(revenue) +
-    0.1 * normalizeStability(stability);
+    0.1 * normalizeStabilityRetention(stability);
 
   const score = Math.max(0, Math.min(10, normalized * 10));
   const tier = classifyTier(score);
@@ -261,43 +266,23 @@ export function normalizeRevenue(usd: number): number {
 }
 
 /**
- * Retention proxy: standard deviation of the app's rank in chart_snapshots
- * over the trailing 90 days ending at t_measure. Lower stddev = more stable
- * rank = better proxy for retention.
- *
- * Returns null when fewer than 3 chart points exist in the window —
- * stddev from 2 points is meaningless. Caller treats null as 0 contribution
- * (handled by normalizeStability).
+ * Retention proxy: thin wrapper over ../signals/rank-stability.computeChartRankStdDev
+ * with the 90-day window pinned (the winner-score formula has always used 90d).
+ * Kept as a named export for callers that imported it before the refactor.
  */
 export function computeRetentionProxyChartStability(
   db: Database,
   app_id: string,
   t_measure: number,
 ): number | null {
-  const fromT = t_measure - NINETY_DAYS_MS;
-  const rows = db
-    .prepare<{ rank: number }, [string, number, number]>(
-      `SELECT rank FROM chart_snapshots
-       WHERE app_id = ? AND captured_at <= ? AND captured_at >= ?`,
-    )
-    .all(app_id, t_measure, fromT);
-  if (rows.length < 3) return null;
-  const ranks = rows.map((r) => r.rank);
-  const mean = ranks.reduce((a, b) => a + b, 0) / ranks.length;
-  const variance = ranks.reduce((acc, r) => acc + (r - mean) ** 2, 0) / ranks.length;
-  return Math.sqrt(variance);
+  return computeChartRankStdDev(db, app_id, t_measure);
 }
 
 /**
- * Map stddev → [0, 1] retention component. sd=0 → 1.0; sd >= breakeven → 0;
- * linear in between. Null input maps to 0 (no data ⇒ no retention credit).
+ * Map stddev → [0, 1] retention component. Re-exported from
+ * ../signals/rank-stability so callers retain the existing import surface.
  */
-export function normalizeStability(sd: number | null): number {
-  if (sd === null || !Number.isFinite(sd)) return 0;
-  if (sd <= 0) return 1;
-  if (sd >= STABILITY_SD_BREAKEVEN) return 0;
-  return 1 - sd / STABILITY_SD_BREAKEVEN;
-}
+export { normalizeStabilityRetention as normalizeStability } from "../signals/rank-stability.ts";
 
 /** Tier boundaries per spec: ≥7 winner, [5,7) marginal, <5 loser. */
 export function classifyTier(score: number): WinnerTier {

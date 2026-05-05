@@ -27,17 +27,19 @@ const STATE_DB = join(STATE_DIR, "state.db");
 const OUT_DIR = join(ROOT, "data", "apptweak-2026-05-04");
 const OUT_TSV = join(OUT_DIR, "chart-snapshots.tsv");
 
-function loadKey(): string {
-  if (process.env.APPTWEAK_KEY) return process.env.APPTWEAK_KEY;
+function loadKey(varName: string): string {
+  if (process.env[varName]) return process.env[varName] as string;
   if (existsSync(ENV_PATH)) {
     const raw = readFileSync(ENV_PATH, "utf8");
-    const m = raw.match(/^\s*APPTWEAK_KEY\s*=\s*(.+?)\s*$/m);
+    const re = new RegExp(`^\\s*${varName}\\s*=\\s*(.+?)\\s*$`, "m");
+    const m = raw.match(re);
     if (m) return m[1].replace(/^['"]|['"]$/g, "");
   }
-  throw new Error("APPTWEAK_KEY not found in env or .env");
+  throw new Error(`${varName} not found in env or .env`);
 }
 
-const KEY = loadKey();
+const KEY_VAR = process.env.APPTWEAK_KEY_VAR ?? "APPTWEAK_KEY";
+const KEY = loadKey(KEY_VAR);
 const BASE = "https://public-api.apptweak.com";
 const ENDPOINT = "/api/public/store/charts/top-results/history.json";
 
@@ -50,30 +52,69 @@ function windowDates(): { start: string; end: string } {
   return { start, end };
 }
 
+type ChartType = "grossing" | "free" | "paid";
 type Pull = {
   device: "iphone" | "android";
   market: string;
   category: string;
-  type: "grossing";
+  type: ChartType;
   category_label: string;
 };
 
-const PULLS: Pull[] = [
-  ...(["id", "vn", "th", "my"] as const).map((m) => ({
-    device: "iphone" as const,
-    market: m,
-    category: "0",
-    type: "grossing" as const,
-    category_label: "top_grossing_overall",
-  })),
-  ...(["id", "vn", "th", "my", "bd"] as const).map((m) => ({
-    device: "android" as const,
-    market: m,
-    category: "ALL",
-    type: "grossing" as const,
-    category_label: "top_grossing_overall",
-  })),
-];
+const DEFAULT_IPHONE_MARKETS = ["id", "vn", "th", "my"];
+const DEFAULT_ANDROID_MARKETS = ["id", "vn", "th", "my", "bd"];
+
+function parseMarkets(envName: string, fallback: string[]): string[] {
+  const raw = process.env[envName];
+  if (!raw) return fallback;
+  return raw
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter((s) => s.length > 0);
+}
+
+function parseTypes(): ChartType[] {
+  const raw = process.env.APPTWEAK_CHART_TYPES;
+  if (!raw) return ["grossing"];
+  const out: ChartType[] = [];
+  for (const t of raw.split(",").map((s) => s.trim().toLowerCase())) {
+    if (t === "grossing" || t === "free" || t === "paid") out.push(t);
+    else throw new Error(`unknown chart type: ${t}`);
+  }
+  return out;
+}
+
+const IPHONE_MARKETS = parseMarkets("APPTWEAK_MARKETS_IPHONE", DEFAULT_IPHONE_MARKETS);
+const ANDROID_MARKETS = parseMarkets("APPTWEAK_MARKETS_ANDROID", DEFAULT_ANDROID_MARKETS);
+const CHART_TYPES = parseTypes();
+
+const TYPE_LABEL: Record<ChartType, string> = {
+  grossing: "top_grossing_overall",
+  free: "top_free_overall",
+  paid: "top_paid_overall",
+};
+
+const PULLS: Pull[] = [];
+for (const t of CHART_TYPES) {
+  for (const m of IPHONE_MARKETS) {
+    PULLS.push({
+      device: "iphone",
+      market: m,
+      category: "0",
+      type: t,
+      category_label: TYPE_LABEL[t],
+    });
+  }
+  for (const m of ANDROID_MARKETS) {
+    PULLS.push({
+      device: "android",
+      market: m,
+      category: "ALL",
+      type: t,
+      category_label: TYPE_LABEL[t],
+    });
+  }
+}
 
 type ChartHistoryResponse = {
   result: Record<string, Record<string, Array<{ date: string; value: number[] | string[] }>>>;
@@ -175,9 +216,13 @@ if (!existsSync(OUT_TSV)) {
 }
 
 const { start, end } = windowDates();
-console.log(`window: ${start} → ${end}`);
-console.log(`pulls: ${PULLS.length}`);
-console.log(`output: ${OUT_TSV}`);
+console.log(`key var: ${KEY_VAR} (...${KEY.slice(-6)})`);
+console.log(`window:  ${start} → ${end}`);
+console.log(`types:   ${CHART_TYPES.join(",")}`);
+console.log(`iphone:  ${IPHONE_MARKETS.join(",")} (${IPHONE_MARKETS.length})`);
+console.log(`android: ${ANDROID_MARKETS.join(",")} (${ANDROID_MARKETS.length})`);
+console.log(`pulls:   ${PULLS.length}`);
+console.log(`output:  ${OUT_TSV}`);
 console.log("---");
 
 let totalRows = 0;

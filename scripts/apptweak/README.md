@@ -59,3 +59,36 @@ Both scripts have hardcoded constants near the top:
 - `pull-enrichment.ts`: `T0S` is a 3-element array of decision dates.
 
 Edit those + change the output dir name (`data/apptweak-{new-date}/`) and re-run. The state DB is shared across runs, so if you want a clean slate, delete `node_modules/.cache/apptweak/state.db` first.
+
+## Multi-account & parameterized runs
+
+Both pull scripts and the discover probe accept env vars to swap API keys and override defaults — used by the global-pull plan (`docs/planning/agent-v1-apptweak-global-pull-plan.md`):
+
+| Env var | Used by | Effect |
+|---|---|---|
+| `APPTWEAK_KEY_VAR` | all 3 | Name of the key var to read (default `APPTWEAK_KEY`). Set to `APPTWEAK_KEY_A2`/`A3` to use alias accounts. The named var must exist in `.env` or process env. |
+| `APPTWEAK_MARKETS_IPHONE` | `pull-charts` | Comma-separated cc list for iPhone pulls (default `id,vn,th,my`). |
+| `APPTWEAK_MARKETS_ANDROID` | `pull-charts` | Comma-separated cc list for Android pulls (default `id,vn,th,my,bd`). |
+| `APPTWEAK_CHART_TYPES` | `pull-charts` | Comma-separated chart types to pull: `grossing`, `free`, `paid` (default `grossing`). |
+| `APPTWEAK_T0S` | `pull-enrichment` | Comma-separated decision dates yyyy-mm-dd (default 3 quarterly t0s). |
+| `APPTWEAK_ENRICH_MARKETS` | `pull-enrichment` | Comma-separated `market:device:store:language` tuples (default 9 tier-2 SEA combos). |
+| `APPTWEAK_ENRICH_CHART_CATEGORY` | `pull-enrichment` | Which chart category in the TSV to source apps from (default `top_grossing_overall`). |
+
+### Discover probe
+
+```sh
+# Probes 249 ISO codes × 2 stores (~500 credits) — records which (cc, device) pairs return chart data
+APPTWEAK_KEY_VAR=APPTWEAK_KEY bun run packages/selection-agent/scripts/apptweak/discover-markets.ts
+# Output: data/apptweak-{date}/markets-coverage.tsv
+```
+
+### Example: Phase 1 global top-grossing on alias account A2
+
+```sh
+APPTWEAK_KEY_VAR=APPTWEAK_KEY_A2 \
+APPTWEAK_MARKETS_IPHONE=us,jp,gb,de,fr,br,mx,...80-codes... \
+APPTWEAK_MARKETS_ANDROID=us,jp,gb,de,fr,br,mx,...80-codes... \
+bun run packages/selection-agent/scripts/apptweak/pull-charts.ts
+```
+
+The state DB tracks (device, market, type) — re-runs across keys SKIP already-completed pulls.

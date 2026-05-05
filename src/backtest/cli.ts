@@ -35,7 +35,11 @@ import { dirname, resolve } from "node:path";
 import { defineCommand } from "citty";
 import { formatError } from "../cli/errors.ts";
 import { computeWinnerScore } from "../ground-truth/winner-score.ts";
-import { type OpportunityMarket, OpportunityMarketSchema } from "../opportunities/schema.ts";
+import {
+  type OpportunityMarket,
+  OpportunityMarketSchema,
+  type SignalValues,
+} from "../opportunities/schema.ts";
 import { renderBrief } from "../reporting/briefs.ts";
 import { computeOpportunityScore, SCORING_VERSION } from "../signals/composer.ts";
 import { runMigrations } from "../storage/schema.ts";
@@ -116,6 +120,31 @@ function parseKValues(raw: unknown, fallback: readonly number[]): number[] {
   return out;
 }
 
+const VALID_SIGNAL_KEYS: ReadonlySet<keyof SignalValues> = new Set([
+  "locGap",
+  "velocity",
+  "incumbent_vulnerability",
+  "cpi_ltv_proxy",
+]);
+
+function parseExcludeSignals(raw: unknown): (keyof SignalValues)[] {
+  if (typeof raw !== "string" || raw.length === 0) return [];
+  const parts = raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+  const out: (keyof SignalValues)[] = [];
+  for (const p of parts) {
+    if (!VALID_SIGNAL_KEYS.has(p as keyof SignalValues)) {
+      throw new Error(
+        `invalid --exclude-signal "${p}" — accepted: ${[...VALID_SIGNAL_KEYS].join(", ")}`,
+      );
+    }
+    out.push(p as keyof SignalValues);
+  }
+  return out;
+}
+
 function parseAppIdsList(raw: unknown): string[] {
   if (typeof raw !== "string" || raw.length === 0) return [];
   return raw
@@ -185,6 +214,11 @@ export const backtestCommand = defineCommand({
       description: "Directory to write the report (default docs/planning)",
       default: "docs/planning",
     },
+    "exclude-signal": {
+      type: "string",
+      description:
+        "Comma-separated signals to drop from the v1 ranker before scoring (one of: locGap, velocity, incumbent_vulnerability, cpi_ltv_proxy). Used for ablation studies.",
+    },
   },
   async run({ args }) {
     try {
@@ -208,6 +242,7 @@ export const backtestCommand = defineCommand({
         const candidateIds = parseAppIdsList(args.apps);
         const candidate_app_ids =
           candidateIds.length > 0 ? candidateIds : selectCandidatesFromCharts(db, market, t0);
+        const exclude_signals = parseExcludeSignals(args["exclude-signal"]);
         report = runBacktest(db, {
           cohort_label: cohort,
           market,
@@ -215,6 +250,7 @@ export const backtestCommand = defineCommand({
           t_measure,
           candidate_app_ids,
           k_values,
+          exclude_signals,
         });
       } finally {
         db.close();
@@ -237,7 +273,7 @@ export const backtestCommand = defineCommand({
       for (const row of report.precision) {
         const lift = row.lift_v1 === 999 ? "∞" : row.lift_v1.toFixed(2);
         process.stdout.write(
-          `  K=${row.k}  v1=${row.v1.toFixed(2)}  locGap=${row.locGap_only.toFixed(2)}  velocity=${row.velocity_only.toFixed(2)}  lift=${lift}\n`,
+          `  K=${row.k}  v1=${row.v1.toFixed(2)}  locGap=${row.locGap_only.toFixed(2)}  velocity=${row.velocity_only.toFixed(2)}  random=${row.random_baseline.toFixed(2)}  lift=${lift}\n`,
         );
       }
       process.exit(0);

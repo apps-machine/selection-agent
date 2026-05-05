@@ -23,47 +23,103 @@
 import { Database } from "bun:sqlite";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { gunzipSync, gzipSync } from "node:zlib";
 
 const ROOT = join(import.meta.dir, "..", "..", "..", "..");
 const ENV_PATH = join(ROOT, ".env");
 const STATE_DIR = join(ROOT, "node_modules", ".cache", "apptweak");
 const STATE_DB = join(STATE_DIR, "state.db");
 const DATA_DIR = join(ROOT, "data", "apptweak-2026-05-04");
-const TSV_IN = join(DATA_DIR, "chart-snapshots.tsv");
+const TSV_PLAIN = join(DATA_DIR, "chart-snapshots.tsv");
+const TSV_GZ = join(DATA_DIR, "chart-snapshots.tsv.gz");
 const META_OUT = join(DATA_DIR, "metadata.jsonl");
 const METRICS_OUT = join(DATA_DIR, "metrics.jsonl");
 
-function loadKey(): string {
-  if (process.env.APPTWEAK_KEY) return process.env.APPTWEAK_KEY;
-  if (existsSync(ENV_PATH)) {
-    const raw = readFileSync(ENV_PATH, "utf8");
-    const m = raw.match(/^\s*APPTWEAK_KEY\s*=\s*(.+?)\s*$/m);
-    if (m) return m[1].replace(/^['"]|['"]$/g, "");
+function loadChartTsv(): string {
+  if (existsSync(TSV_GZ)) {
+    return gunzipSync(readFileSync(TSV_GZ)).toString("utf8");
   }
-  throw new Error("APPTWEAK_KEY not found");
+  if (existsSync(TSV_PLAIN)) {
+    return readFileSync(TSV_PLAIN, "utf8");
+  }
+  throw new Error(`chart TSV not found (looked for ${TSV_GZ} and ${TSV_PLAIN})`);
 }
 
-const KEY = loadKey();
+let chartTsvCache: string | null = null;
+function getChartTsv(): string {
+  if (chartTsvCache === null) chartTsvCache = loadChartTsv();
+  return chartTsvCache;
+}
+
+function loadKey(varName: string): string {
+  if (process.env[varName]) return process.env[varName] as string;
+  if (existsSync(ENV_PATH)) {
+    const raw = readFileSync(ENV_PATH, "utf8");
+    const re = new RegExp(`^\\s*${varName}\\s*=\\s*(.+?)\\s*$`, "m");
+    const m = raw.match(re);
+    if (m) return m[1].replace(/^['"]|['"]$/g, "");
+  }
+  throw new Error(`${varName} not found in env or .env`);
+}
+
+const KEY_VAR = process.env.APPTWEAK_KEY_VAR ?? "APPTWEAK_KEY";
+const KEY = loadKey(KEY_VAR);
 const BASE = "https://public-api.apptweak.com";
 const META_PATH = "/api/public/store/apps/metadata.json";
 const METRICS_PATH = "/api/public/store/apps/metrics/history.json";
 const BATCH_SIZE = 5;
 const PACING_MS = 250;
 
-const T0S = ["2025-05-04", "2025-08-04", "2025-11-04"] as const;
-type T0 = (typeof T0S)[number];
+type T0 = string;
+type Device = "iphone" | "android";
+type Store = "apple" | "googleplay";
+type EnrichMarket = { market: string; device: Device; store: Store; language: string };
 
-const MARKETS = [
-  { market: "id", device: "iphone" as const, store: "apple" as const, language: "id" },
-  { market: "vn", device: "iphone" as const, store: "apple" as const, language: "vi" },
-  { market: "th", device: "iphone" as const, store: "apple" as const, language: "th" },
-  { market: "my", device: "iphone" as const, store: "apple" as const, language: "ms" },
-  { market: "id", device: "android" as const, store: "googleplay" as const, language: "id" },
-  { market: "vn", device: "android" as const, store: "googleplay" as const, language: "vi" },
-  { market: "th", device: "android" as const, store: "googleplay" as const, language: "th" },
-  { market: "my", device: "android" as const, store: "googleplay" as const, language: "ms" },
-  { market: "bd", device: "android" as const, store: "googleplay" as const, language: "bn" },
+const DEFAULT_T0S: T0[] = ["2025-05-04", "2025-08-04", "2025-11-04"];
+const DEFAULT_MARKETS: EnrichMarket[] = [
+  { market: "id", device: "iphone", store: "apple", language: "id" },
+  { market: "vn", device: "iphone", store: "apple", language: "vi" },
+  { market: "th", device: "iphone", store: "apple", language: "th" },
+  { market: "my", device: "iphone", store: "apple", language: "ms" },
+  { market: "id", device: "android", store: "googleplay", language: "id" },
+  { market: "vn", device: "android", store: "googleplay", language: "vi" },
+  { market: "th", device: "android", store: "googleplay", language: "th" },
+  { market: "my", device: "android", store: "googleplay", language: "ms" },
+  { market: "bd", device: "android", store: "googleplay", language: "bn" },
 ];
+
+function parseT0s(): T0[] {
+  const raw = process.env.APPTWEAK_T0S;
+  if (!raw) return DEFAULT_T0S;
+  const out: T0[] = [];
+  for (const s of raw.split(",").map((x) => x.trim())) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) throw new Error(`bad t0 (need yyyy-mm-dd): ${s}`);
+    out.push(s);
+  }
+  return out;
+}
+
+function parseMarkets(): EnrichMarket[] {
+  const raw = process.env.APPTWEAK_ENRICH_MARKETS;
+  if (!raw) return DEFAULT_MARKETS;
+  const out: EnrichMarket[] = [];
+  for (const item of raw
+    .split(",")
+    .map((x) => x.trim())
+    .filter((x) => x.length > 0)) {
+    const [market, device, store, language] = item.split(":");
+    if (!market || !device || !store) {
+      throw new Error(`bad market spec (need market:device:store[:language]): ${item}`);
+    }
+    if (device !== "iphone" && device !== "android") throw new Error(`bad device: ${device}`);
+    if (store !== "apple" && store !== "googleplay") throw new Error(`bad store: ${store}`);
+    out.push({ market: market.toLowerCase(), device, store, language: language ?? "" });
+  }
+  return out;
+}
+
+const T0S = parseT0s();
+const MARKETS = parseMarkets();
 
 function dateMs(yyyymmdd: string): number {
   return Date.UTC(
@@ -73,8 +129,10 @@ function dateMs(yyyymmdd: string): number {
   );
 }
 
+const ENRICH_CHART_CATEGORY = process.env.APPTWEAK_ENRICH_CHART_CATEGORY ?? "top_grossing_overall";
+
 function loadChartApps(market: string, store: string, t0: T0): string[] {
-  const tsv = readFileSync(TSV_IN, "utf8");
+  const tsv = getChartTsv();
   const targetMs = dateMs(t0);
   const apps: string[] = [];
   let isHeader = true;
@@ -85,7 +143,12 @@ function loadChartApps(market: string, store: string, t0: T0): string[] {
       continue;
     }
     const cols = line.split("\t");
-    if (cols[1] === market && cols[6] === store && Number(cols[3]) === targetMs) {
+    if (
+      cols[1] === market &&
+      cols[6] === store &&
+      cols[2] === ENRICH_CHART_CATEGORY &&
+      Number(cols[3]) === targetMs
+    ) {
       apps.push(cols[0]);
     }
   }
@@ -162,13 +225,25 @@ const markCompleted = state.prepare(
   "INSERT INTO enrichment_completed VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
 );
 
-if (!existsSync(META_OUT)) writeFileSync(META_OUT, "");
-if (!existsSync(METRICS_OUT)) writeFileSync(METRICS_OUT, "");
+function bootstrapJsonl(plain: string): void {
+  if (existsSync(plain)) return;
+  const gz = `${plain}.gz`;
+  if (existsSync(gz)) {
+    writeFileSync(plain, gunzipSync(readFileSync(gz)));
+    console.log(`bootstrapped ${plain} from ${gz}`);
+    return;
+  }
+  writeFileSync(plain, "");
+}
+
+bootstrapJsonl(META_OUT);
+bootstrapJsonl(METRICS_OUT);
 
 let totalCost = 0;
 let totalCalls = 0;
 const startedMs = Date.now();
 
+console.log(`key var: ${KEY_VAR} (...${KEY.slice(-6)})`);
 console.log(`t0s: ${T0S.join(", ")}`);
 console.log(`(market, store) combos: ${MARKETS.length}`);
 console.log(`endpoints: metadata + metrics(ratings,app-power)`);
@@ -191,14 +266,15 @@ for (const t0 of T0S) {
       let cost = 0;
       let succeeded = 0;
       for (const batch of batches) {
-        const body = await callApi(META_PATH, {
+        const params: Record<string, string> = {
           apps: batch.join(","),
           country: m.market,
           device: m.device,
-          language: m.language,
           start_date: t0,
           end_date: t0,
-        });
+        };
+        if (m.language) params.language = m.language;
+        const body = await callApi(META_PATH, params);
         totalCalls += 1;
         if (body) {
           cost += body.metadata?.request?.cost ?? 0;
@@ -274,9 +350,17 @@ for (const t0 of T0S) {
   }
 }
 
+function repackJsonl(plain: string): void {
+  if (!existsSync(plain)) return;
+  writeFileSync(`${plain}.gz`, gzipSync(readFileSync(plain), { level: 9 }));
+}
+
+repackJsonl(META_OUT);
+repackJsonl(METRICS_OUT);
+
 const elapsedSec = ((Date.now() - startedMs) / 1000).toFixed(1);
 console.log("---");
 console.log(`done in ${elapsedSec}s, ${totalCalls} API calls`);
 console.log(`credits used:    ${totalCost}`);
-console.log(`metadata JSONL:  ${META_OUT}`);
-console.log(`metrics JSONL:   ${METRICS_OUT}`);
+console.log(`metadata JSONL:  ${META_OUT} (+ ${META_OUT}.gz)`);
+console.log(`metrics JSONL:   ${METRICS_OUT} (+ ${METRICS_OUT}.gz)`);

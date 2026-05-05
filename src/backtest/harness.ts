@@ -111,6 +111,16 @@ export interface BacktestOptions {
   /** Precision@K cutoffs to report. Defaults to DEFAULT_K_VALUES. */
   k_values?: number[];
   /**
+   * Signals to drop from the v1 ranker before scoring. Each excluded signal
+   * is set to null in the per-app SignalValues; the composer's MIN_NON_NULL
+   * threshold then naturally shrinks the eligible cohort. Used for ablation
+   * studies — answer "does removing signal X hurt precision@K?".
+   *
+   * Example: `exclude_signals: ['locGap']` measures the v1 ranker's quality
+   * if the locGap LLM judge were unavailable.
+   */
+  exclude_signals?: readonly (keyof SignalValues)[];
+  /**
    * Skip the freezeCohort write (and use this freeze instead). Used by
    * tests that need to inject a freeze constructed in-test, and by callers
    * that have already frozen the cohort in a prior step.
@@ -129,6 +139,13 @@ export interface PrecisionRow {
   v1: number;
   locGap_only: number;
   velocity_only: number;
+  /**
+   * Random-shuffle baseline — reorders the eligible cohort with a t0-seeded
+   * PRNG and reports precision@K. Sanity check: v1 should comfortably beat
+   * random; if v1 ≈ random_baseline the ranker is as good as a coin flip and
+   * the locGap-thesis is not adding value.
+   */
+  random_baseline: number;
   /** v1 precision / locGap_only precision. Sentinel LIFT_INFINITY_SENTINEL when baseline is 0. */
   lift_v1: number;
 }
@@ -196,6 +213,7 @@ export function runBacktest(db: Database, opts: BacktestOptions): BacktestReport
         v1: 0,
         locGap_only: 0,
         velocity_only: 0,
+        random_baseline: 0,
         lift_v1: 0,
       })),
       details: { top_k_v1: [] },
@@ -226,11 +244,13 @@ export function runBacktest(db: Database, opts: BacktestOptions): BacktestReport
     perApp.set(id, { signals: {}, latestPerSignal: new Map() });
   }
 
+  const excluded = new Set<keyof SignalValues>(opts.exclude_signals ?? []);
   for (const r of rows) {
     const slot = perApp.get(r.app_id);
     if (!slot) continue; // app not in the frozen cohort (shouldn't happen — defensive)
     const schemaKey = SIGNAL_NAME_TO_SCHEMA_KEY[r.signal_name];
     if (!schemaKey) continue; // not a v1 ranking signal (e.g., 'thesis', 'review_count')
+    if (excluded.has(schemaKey)) continue; // ablation: drop this signal from the cohort
     if (r.value === null) continue; // null values can't enter the composer
     const prevT = slot.latestPerSignal.get(r.signal_name);
     if (prevT === undefined || r.t > prevT) {
@@ -254,6 +274,11 @@ export function runBacktest(db: Database, opts: BacktestOptions): BacktestReport
   // excluded from the baseline (parallel to the v1 eligibility rule).
   const locGapRanked = singleSignalRanking(perApp, "locGap");
   const velocityRanked = singleSignalRanking(perApp, "velocity");
+  // Random baseline — shuffle the v1-eligible cohort with a t0-seeded PRNG.
+  // We shuffle the same eligible set so the comparison is apples-to-apples
+  // (otherwise random would benefit from / be hurt by ranking ineligible
+  // apps). The seed is the t0 timestamp so re-runs are deterministic.
+  const randomRanked = shuffleDeterministic(v1Ranked, opts.t0);
 
   // Read winner_scores at t_measure. We tolerate `measured_at != t_measure`
   // because the production winner-score pipeline records the actual
@@ -269,8 +294,9 @@ export function runBacktest(db: Database, opts: BacktestOptions): BacktestReport
     const v1 = precisionAtK(v1Ranked, tierByApp, k);
     const locGap_only = precisionAtK(locGapRanked, tierByApp, k);
     const velocity_only = precisionAtK(velocityRanked, tierByApp, k);
+    const random_baseline = precisionAtK(randomRanked, tierByApp, k);
     const lift_v1 = computeLift(v1, locGap_only);
-    return { k, v1, locGap_only, velocity_only, lift_v1 };
+    return { k, v1, locGap_only, velocity_only, random_baseline, lift_v1 };
   });
 
   // top_k_v1 details: K = max(k_values). Caller can slice further at
@@ -339,6 +365,30 @@ function computeLift(v1: number, baseline: number): number {
   return v1 / baseline;
 }
 
+/**
+ * Deterministic Fisher-Yates shuffle. Uses an xorshift32 PRNG seeded by `seed`
+ * so the same input + seed produce the same output across processes. Falling
+ * back to Math.random would break backtest reproducibility (Codex R2 #6).
+ */
+function shuffleDeterministic<T>(items: readonly T[], seed: number): T[] {
+  const out = [...items];
+  let state = seed | 0 || 0x9e3779b9;
+  const next = (): number => {
+    state ^= state << 13;
+    state ^= state >>> 17;
+    state ^= state << 5;
+    state |= 0;
+    return ((state >>> 0) % 0x7fffffff) / 0x7fffffff;
+  };
+  for (let i = out.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(next() * (i + 1));
+    const tmp = out[i] as T;
+    out[i] = out[j] as T;
+    out[j] = tmp;
+  }
+  return out;
+}
+
 function readWinnerTiers(
   db: Database,
   app_ids: readonly string[],
@@ -378,12 +428,12 @@ export function renderBacktestReportMarkdown(report: BacktestReport): string {
   lines.push("");
   lines.push("## Precision @ K");
   lines.push("");
-  lines.push("| K | v1 | locGap_only | velocity_only | lift over locGap |");
-  lines.push("|---|----|-------------|----------------|------------------|");
+  lines.push("| K | v1 | locGap_only | velocity_only | random | lift over locGap |");
+  lines.push("|---|----|-------------|----------------|--------|------------------|");
   for (const row of report.precision) {
     const lift = row.lift_v1 === LIFT_INFINITY_SENTINEL ? "∞ (baseline=0)" : row.lift_v1.toFixed(2);
     lines.push(
-      `| ${row.k} | ${row.v1.toFixed(2)} | ${row.locGap_only.toFixed(2)} | ${row.velocity_only.toFixed(2)} | ${lift} |`,
+      `| ${row.k} | ${row.v1.toFixed(2)} | ${row.locGap_only.toFixed(2)} | ${row.velocity_only.toFixed(2)} | ${row.random_baseline.toFixed(2)} | ${lift} |`,
     );
   }
   lines.push("");

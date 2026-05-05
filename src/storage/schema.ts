@@ -188,6 +188,72 @@ CREATE TABLE IF NOT EXISTS app_metadata_snapshots (
 ` as const;
 
 /**
+ * v1-2026-05-05-chart-snapshots-add-store — adds a `store` column to
+ * chart_snapshots and includes it in the PK. AppTweak data covers both
+ * Apple and Google charts, and rank-1 in (id, top_grossing_overall) collides
+ * across stores; the original PK (market, category, captured_at, rank) does
+ * not disambiguate. Existing rows (appgoblin imports + 42matters live cron,
+ * both Apple-only at time of writing) backfill to store='apple'.
+ *
+ * Future inserts MUST set store explicitly. The schema retains a DEFAULT
+ * 'apple' so legacy callers (appgoblin-import.ts) keep working without a
+ * code change in this commit; they should be updated separately to insert
+ * store explicitly when they handle Google data.
+ */
+export const CHART_SNAPSHOTS_ADD_STORE_SCHEMA = `
+CREATE TABLE IF NOT EXISTS chart_snapshots__new (
+  market      TEXT NOT NULL,
+  category    TEXT NOT NULL,
+  captured_at INTEGER NOT NULL,
+  rank        INTEGER NOT NULL,
+  app_id      TEXT NOT NULL,
+  source      TEXT NOT NULL,
+  store       TEXT NOT NULL DEFAULT 'apple' CHECK(store IN ('apple','googleplay')),
+  PRIMARY KEY (market, category, captured_at, rank, store)
+);
+INSERT OR IGNORE INTO chart_snapshots__new
+  (market, category, captured_at, rank, app_id, source, store)
+  SELECT market, category, captured_at, rank, app_id, source, 'apple'
+    FROM chart_snapshots;
+DROP TABLE chart_snapshots;
+ALTER TABLE chart_snapshots__new RENAME TO chart_snapshots;
+CREATE INDEX IF NOT EXISTS idx_chart_snapshots_app
+  ON chart_snapshots(app_id, captured_at);
+` as const;
+
+/**
+ * v1-2026-05-05-app-metadata-snapshots-add-apptweak — extends the source
+ * CHECK to allow 'apptweak'. SQLite cannot ALTER an existing CHECK; the
+ * migration rebuilds the table via the canonical create-new / copy / drop /
+ * rename sequence. Idempotent: if the new CHECK is already in place
+ * (subsequent runs), the rebuild becomes a no-op insert from an empty old
+ * table.
+ *
+ * Path B'''' adds AppTweak as the historical chart-rank + metadata source;
+ * the importers in src/ground-truth/apptweak-import.ts INSERT with
+ * source='apptweak'. Without this CHECK extension the inserts would fail
+ * with a CHECK constraint violation.
+ */
+export const APP_METADATA_SNAPSHOTS_ADD_APPTWEAK_SCHEMA = `
+CREATE TABLE IF NOT EXISTS app_metadata_snapshots__new (
+  app_id               TEXT NOT NULL,
+  market               TEXT NOT NULL,
+  captured_at          INTEGER NOT NULL,
+  source               TEXT NOT NULL CHECK(source IN ('42matters','wayback','live_scrape','appgoblin','apptweak')),
+  wayback_snapshot_url TEXT,
+  raw_html_path        TEXT,
+  parsed_json          TEXT NOT NULL,
+  PRIMARY KEY (app_id, market, captured_at, source)
+);
+INSERT OR IGNORE INTO app_metadata_snapshots__new
+  (app_id, market, captured_at, source, wayback_snapshot_url, raw_html_path, parsed_json)
+  SELECT app_id, market, captured_at, source, wayback_snapshot_url, raw_html_path, parsed_json
+    FROM app_metadata_snapshots;
+DROP TABLE app_metadata_snapshots;
+ALTER TABLE app_metadata_snapshots__new RENAME TO app_metadata_snapshots;
+` as const;
+
+/**
  * rate_limit_queue — SQLite-backed FIFO queue for rate-limited fetchers
  * (Codex Round 2 #7 fix). Used by src/ground-truth/wayback-fetch.ts so a
  * crashed batch resumes from the last committed offset instead of from
@@ -275,6 +341,14 @@ export const V1_MIGRATIONS: readonly { readonly version: string; readonly ddl: s
   {
     version: "v1-2026-05-02-rate-limit-queue",
     ddl: RATE_LIMIT_QUEUE_MIGRATION_SCHEMA,
+  },
+  {
+    version: "v1-2026-05-05-chart-snapshots-add-store",
+    ddl: CHART_SNAPSHOTS_ADD_STORE_SCHEMA,
+  },
+  {
+    version: "v1-2026-05-05-app-metadata-snapshots-add-apptweak",
+    ddl: APP_METADATA_SNAPSHOTS_ADD_APPTWEAK_SCHEMA,
   },
 ] as const;
 

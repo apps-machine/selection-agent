@@ -797,3 +797,72 @@ describe("DEFAULT_K_VALUES + report rendering", () => {
     expect(md).toContain("app1");
   });
 });
+
+// ─── exclude_signals ablation ────────────────────────────────────────
+
+describe("exclude_signals ablation", () => {
+  let db: Database;
+
+  beforeEach(() => {
+    db = new Database(":memory:");
+    runMigrations(db);
+    chartRankCounter = 0;
+  });
+  afterEach(() => db.close());
+
+  test("excluding 1 signal drops eligibility for apps with N=3 signals before exclusion", () => {
+    // app1 has only 3 non-null signals (no cpi_ltv_proxy). Excluding locGap
+    // leaves 2 → ineligible.
+    insertChart(db, { app_id: "app1", captured_at: T0 - DAY_MS });
+    insertSignal(db, { app_id: "app1", signal: "locGap", t: T0 - DAY_MS, value: 8 });
+    insertSignal(db, { app_id: "app1", signal: "velocity", t: T0 - DAY_MS, value: 7 });
+    insertSignal(db, {
+      app_id: "app1",
+      signal: "incumbent_vulnerability",
+      t: T0 - DAY_MS,
+      value: 6,
+    });
+
+    const freeze = { t0: T0, market: MARKET, app_ids: ["app1"] };
+
+    const reportFull = runBacktest(
+      db,
+      makeOpts({ candidate_app_ids: ["app1"], existing_freeze: freeze }),
+    );
+    expect(reportFull.eligible_count).toBe(1);
+
+    const reportAblated = runBacktest(
+      db,
+      makeOpts({
+        candidate_app_ids: ["app1"],
+        exclude_signals: ["locGap"],
+        existing_freeze: freeze,
+      }),
+    );
+    expect(reportAblated.eligible_count).toBe(0);
+  });
+
+  test("excluding 1 signal of a 4-signal app keeps it eligible at the new top-3", () => {
+    insertChart(db, { app_id: "app1", captured_at: T0 - DAY_MS });
+    plantFullSignalSet(db, {
+      app_id: "app1",
+      t: T0 - DAY_MS,
+      locGap: 9,
+      velocity: 8,
+      incumbent_vulnerability: 7,
+      cpi_ltv_proxy: 6,
+    });
+
+    const reportAblated = runBacktest(
+      db,
+      makeOpts({
+        candidate_app_ids: ["app1"],
+        exclude_signals: ["locGap"],
+        existing_freeze: { t0: T0, market: MARKET, app_ids: ["app1"] },
+      }),
+    );
+    expect(reportAblated.eligible_count).toBe(1);
+    // After excluding locGap, top-3 = {8, 7, 6} → mean = 7
+    expect(reportAblated.details.top_k_v1[0]?.score).toBeCloseTo(7);
+  });
+});

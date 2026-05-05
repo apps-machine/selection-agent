@@ -26,10 +26,12 @@ import { z } from "zod";
 export const OpportunityMarketSchema = z.enum([
   "us",
   "jp",
+  "kr",
   "de",
   "fr",
   "br",
   "es",
+  "mx",
   "id",
   "vn",
   "th",
