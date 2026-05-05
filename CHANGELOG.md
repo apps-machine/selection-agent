@@ -5,6 +5,82 @@ All notable changes to `@apps-machine/selection-agent` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2026-05-05
+
+Global AppTweak dataset + backtest consumers. Extends the Path B''' SEA-only
+frozen dataset to a publishable-grade global dataset and lands the consumer
+pipeline (Tasks 1-5 from the third handover) so the backtest is end-to-end
+runnable as soon as the locGap LLM judge ships.
+
+### Added
+
+- `chart_snapshots.category` CHECK constraint extended to accept
+  `top_grossing_overall` and `top_free_overall`. Market codes opened up
+  to the ~130 ISO 3166-1 alpha-2 codes that AppTweak supports (was 5 SEA
+  markets only). Migration is additive and idempotent for existing rows.
+- `scripts/apptweak/discover-markets.ts` — probes 249 ISO codes ×
+  `{iphone, android}` against the AppTweak chart endpoint and records
+  per-(cc, device) coverage to `markets-coverage.tsv`. Use as the source
+  of truth for which markets AppTweak supports before bulk-pulling.
+- `scripts/apptweak/pull-charts.ts` and `pull-enrichment.ts`:
+  parameterized via env vars (`APPTWEAK_KEY_VAR`,
+  `APPTWEAK_MARKETS_IPHONE/ANDROID`, `APPTWEAK_CHART_TYPES`,
+  `APPTWEAK_T0S`, `APPTWEAK_ENRICH_MARKETS`,
+  `APPTWEAK_ENRICH_CHART_CATEGORY`). Defaults preserve original behavior;
+  multi-account orchestration enabled for global pulls.
+- `pull-enrichment.ts` reads `chart-snapshots.tsv.gz` (gzipped TSV) via
+  `node:zlib.gunzipSync`. Auto-bootstraps `metadata.jsonl` from
+  `metadata.jsonl.gz` on startup if needed; recompresses on exit. The
+  uncompressed forms are now gitignored under `data/apptweak-*/`.
+- `data/apptweak-2026-05-04/` extended to global coverage (private to
+  the monorepo, not mirrored to OSS):
+  - 11.7M chart rows, 136 unique markets, 258 (cc, device) combos.
+  - 12 monthly enrichment t0s on tier-2 SEA (May 2025 → April 2026).
+  - 5 tier-1 control markets (us/jp/kr/br/mx) at 2 t0s (2025-08-04 +
+    2026-02-04) for cross-tier comparability.
+  - Top-free across 32 unique markets.
+
+### Internal (OSS-mirrored, not npm-published)
+
+- `src/ground-truth/apptweak-import.ts`: TSV.gz loader, idempotent
+  `INSERT OR IGNORE` on PK. Drops + recreates `idx_chart_snapshots_app`
+  around bulk insert (Codex R2 #8 fix retained from `appgoblin-import` —
+  converts O(N log N) per-row B-tree maintenance into a single rebuild).
+- `src/ground-truth/apptweak-jsonl.ts`: streaming reader for
+  `metadata.jsonl` + `metrics.jsonl`. Streams + indexes in memory rather
+  than importing into SQLite — every consumer is a one-shot scan.
+- `src/signals/rank-stability.ts`: extracted std-dev primitives from
+  `winner-score.ts` so the v1 incumbent-vulnerability fallback can reuse
+  the math without depending on winner-score orchestration. Two
+  normalizers: retention-proxy (sd=0 → 1, sd ≥ breakeven → 0) and
+  vulnerability (sd=0 → 0, sd ≥ breakeven → 10).
+- `src/signals/incumbent-vulnerability.ts`: wires rank-stability as the
+  v1 fallback path when no enrichment metrics are available.
+- `src/backtest/{cli,harness}.ts`: wires the harness to AppTweak
+  importers; previously hard-coded to the AppGoblin path.
+- 4 new test files covering the new code paths. 739 / 739 pass.
+
+### Empirical findings (recorded for future plans)
+
+- AppTweak credit pricing: chart pulls match plan (~375 credits per
+  (m, s, 12 mo)), but per-(m, s, t0) full enrichment is ~2,500 credits
+  (metadata ~1,020 + metrics ~1,500), not ~1,100 as planned. ~2.3×
+  overrun on enrichment. Cost model recalibrated mid-flight.
+- Language code semantics in `/store/apps/metadata.json`: `jp:ja`,
+  `kr:ko`, `id:id`, `vn:vi`, `th:th`, `my:ms`, `bd:bn` work; `us:en`,
+  `br:pt`, `mx:es` and regional variants (`en-US`, `pt-BR`, `es-MX`,
+  `es_419`) all fail with 422. `us:us`, `br:br` work (country code as
+  language). `mx` requires omitting the language param entirely.
+  `parseMarkets()` accepts an empty language segment for this case.
+- Idempotence pitfall: state DB at
+  `node_modules/.cache/apptweak/state.db` resets between sessions while
+  `chart-snapshots.tsv.gz` persists. Phase 1 of the global pull
+  re-pulled the 9 SEA combos already in the baseline TSV. Detected
+  during Phase 2.a (which paid 2× for ~26k credits before being
+  aborted). Fixed by deduping on the full row tuple. Future re-runs
+  should preserve state across sessions or probe the TSV before
+  triggering pulls.
+
 ## [0.8.1] - 2026-05-02
 
 Forward-collection fix. Closes a v0.7.0 oversight discovered during agent v1 build.
