@@ -798,6 +798,168 @@ describe("DEFAULT_K_VALUES + report rendering", () => {
   });
 });
 
+// ─── signal_prompt_version_filter (market-aware signals) ─────────────
+
+describe("signal_prompt_version_filter selects only matching rows per signal", () => {
+  let db: Database;
+
+  beforeEach(() => {
+    db = new Database(":memory:");
+    runMigrations(db);
+    chartRankCounter = 0;
+  });
+
+  afterEach(() => {
+    db.close();
+  });
+
+  test("filter selects the matching prompt_version's locGap value when multiple markets co-exist", () => {
+    // Setup: one app with TWO locGap rows at the same (app_id, t) but different
+    // prompt_versions — simulating the per-market AppTweak judge run where the
+    // same app appears in market `id` (Indonesian listing → high locGap) and
+    // market `us` (English listing → low locGap).
+    //
+    // Without the filter the harness picks the LATEST `t` per signal — both
+    // rows share the same `t` so the result is unspecified-but-stable. With the
+    // filter, we pin which row wins.
+    //
+    // We also seed 2 OTHER signals to make the app eligible (N≥3), and pick
+    // values such that the v1 ranker score is dominated by the locGap value
+    // we pin via the filter. velocity=8, incumbent_vulnerability=8 means
+    // top-3 mean = (loc + 8 + 8) / 3. With loc=8.5 → score = 8.166…; with
+    // loc=2.0 → score = 6.0. Easy to distinguish.
+    insertChart(db, { app_id: "app1", captured_at: T0 - 1000 });
+    insertSignal(db, {
+      app_id: "app1",
+      signal: "locGap",
+      t: T0 - 100,
+      value: 8.5,
+      prompt_version: "v1.0.0-apptweak-id",
+    });
+    insertSignal(db, {
+      app_id: "app1",
+      signal: "locGap",
+      t: T0 - 100,
+      value: 2.0,
+      prompt_version: "v1.0.0-apptweak-us",
+    });
+    insertSignal(db, { app_id: "app1", signal: "velocity", t: T0 - 100, value: 8 });
+    insertSignal(db, {
+      app_id: "app1",
+      signal: "incumbent_vulnerability",
+      t: T0 - 100,
+      value: 8,
+    });
+    insertWinnerScore(db, { app_id: "app1", t0: T0, t_measure: T_MEASURE, tier: "winner" });
+
+    const freeze = { t0: T0, market: MARKET, app_ids: ["app1"] };
+
+    const reportId = runBacktest(
+      db,
+      makeOpts({
+        candidate_app_ids: ["app1"],
+        k_values: [5],
+        signal_prompt_version_filter: { locGap: "v1.0.0-apptweak-id" },
+        existing_freeze: freeze,
+      }),
+    );
+    expect(reportId.eligible_count).toBe(1);
+    // top-3 mean with locGap=8.5: (8.5 + 8 + 8) / 3 = 8.1666…
+    expect(reportId.details.top_k_v1[0]?.score).toBeCloseTo(8.5 / 3 + 16 / 3);
+
+    const reportUs = runBacktest(
+      db,
+      makeOpts({
+        candidate_app_ids: ["app1"],
+        k_values: [5],
+        signal_prompt_version_filter: { locGap: "v1.0.0-apptweak-us" },
+        existing_freeze: freeze,
+      }),
+    );
+    expect(reportUs.eligible_count).toBe(1);
+    // top-3 mean with locGap=2.0: (2 + 8 + 8) / 3 = 6.0
+    expect(reportUs.details.top_k_v1[0]?.score).toBeCloseTo(6);
+  });
+
+  test("filter affects only the named signal; other signals are unfiltered", () => {
+    // Two locGap rows (different prompt_versions) + one velocity row that has
+    // a non-matching prompt_version. The filter only constrains locGap.
+    insertChart(db, { app_id: "app1", captured_at: T0 - 1000 });
+    insertSignal(db, {
+      app_id: "app1",
+      signal: "locGap",
+      t: T0 - 100,
+      value: 8.5,
+      prompt_version: "v1.0.0-apptweak-id",
+    });
+    insertSignal(db, {
+      app_id: "app1",
+      signal: "locGap",
+      t: T0 - 100,
+      value: 2.0,
+      prompt_version: "v1.0.0-apptweak-vn",
+    });
+    insertSignal(db, {
+      app_id: "app1",
+      signal: "velocity",
+      t: T0 - 100,
+      value: 9,
+      prompt_version: "some-other-version",
+    });
+    insertSignal(db, {
+      app_id: "app1",
+      signal: "incumbent_vulnerability",
+      t: T0 - 100,
+      value: 9,
+    });
+
+    const report = runBacktest(
+      db,
+      makeOpts({
+        candidate_app_ids: ["app1"],
+        k_values: [5],
+        signal_prompt_version_filter: { locGap: "v1.0.0-apptweak-id" },
+      }),
+    );
+    expect(report.eligible_count).toBe(1);
+    // velocity=9 was kept (no filter for velocity), locGap=8.5 (filter picked id).
+    // top-3 mean = (8.5 + 9 + 9) / 3 = 8.833…
+    expect(report.details.top_k_v1[0]?.score).toBeCloseTo((8.5 + 9 + 9) / 3);
+  });
+
+  test("no filter set → existing behavior preserved (latest-t row wins per signal)", () => {
+    // Sanity: when signal_prompt_version_filter is undefined, the harness
+    // behaves exactly as before — the LATEST-t row per (app, signal) wins.
+    insertChart(db, { app_id: "app1", captured_at: T0 - 1000 });
+    insertSignal(db, {
+      app_id: "app1",
+      signal: "locGap",
+      t: T0 - 200,
+      value: 5,
+      prompt_version: "old-v",
+    });
+    insertSignal(db, {
+      app_id: "app1",
+      signal: "locGap",
+      t: T0 - 100,
+      value: 9,
+      prompt_version: "new-v",
+    });
+    insertSignal(db, { app_id: "app1", signal: "velocity", t: T0 - 100, value: 9 });
+    insertSignal(db, {
+      app_id: "app1",
+      signal: "incumbent_vulnerability",
+      t: T0 - 100,
+      value: 9,
+    });
+
+    const report = runBacktest(db, makeOpts({ candidate_app_ids: ["app1"], k_values: [5] }));
+    expect(report.eligible_count).toBe(1);
+    // Latest t (=T0-100) row has locGap=9 → top-3 mean = 9
+    expect(report.details.top_k_v1[0]?.score).toBeCloseTo(9);
+  });
+});
+
 // ─── exclude_signals ablation ────────────────────────────────────────
 
 describe("exclude_signals ablation", () => {

@@ -5,6 +5,52 @@ All notable changes to `@apps-machine/selection-agent` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] - 2026-05-07
+
+Path B' verdict shipped: locGap LLM judge + 70-cohort backtest infrastructure
++ DEAD verdict on the localization-gap thesis. The infrastructure is reusable
+for future thesis variants; the v1 production ranker carries a structural
+weakness (velocity is anti-predictive) that should inform v2 design.
+
+### Added
+
+- `src/judges/apptweak-loc-gap-adapter.ts` — pure adapter: `AppTweakMetadataRecord`
+  → minimal `RawAppData` for the locGap text-judge. Handles store name
+  normalization (`googleplay` → `google`) and short-circuits null metadata
+  (AppTweak 422 responses).
+- `src/judges/apptweak-loc-gap-runner.ts` — streaming LLM-judge runner with
+  resume + budget cap. Per-market `apptweakLocGapPromptVersion(market)`
+  scheme: `v1.0.0-apptweak-{id,vn,th,my,bd,us,jp,kr,br,mx}`. Idempotent at
+  the `signal_snapshots` PK level.
+- `src/ground-truth/simple-winner-score.ts` — boolean alternative to v1's
+  weighted formula: tier=`winner` iff present in top-100 within `t_measure ± 7d`.
+  Exists alongside `winner-score.ts` (untouched) for backtests where review/
+  revenue inputs are unavailable.
+- `src/backtest/locgap-baseline-stats.ts` — pure stats reducer for sanity-check
+  baselines per (market, t0).
+- `src/backtest/pathb-multi-cohort.ts` — internal: 70-cohort batch runner +
+  aggregate stats + paired-comparison deltas. Not in `package.json:files`
+  whitelist (internal, not shipped to npm).
+- `BacktestOptions.signal_prompt_version_filter` — per-signal prompt_version
+  filter. Used by the multi-cohort runner to select the per-market locGap row
+  for each cohort.
+- `BacktestOptions.skip_leakage_check` + `GetFrozenCohortFeaturesOptions`
+  opt-out — disables the post-t0-row leakage tripwire for batch-precomputed
+  multi-cohort runs (where post-t0 rows are LATER cohorts, not leakage).
+  The SELECT cutoff (`t<=t0`) still applies.
+
+### Notes
+
+- Path B verdict — locGap thesis DEAD. See `docs/planning/agent-v1-path-b-results.md`
+  for the precision@K tables, paired-comparison deltas, and recommended
+  next moves (re-frame as new-entrant prediction; tighten winner threshold;
+  per-category breakdown).
+- Velocity is anti-predictive on this dataset (precision@K consistently
+  below random across 70 cohorts). v2 should de-weight velocity or replace
+  it with a stability-style signal.
+- LLM judge spend on the validation: ~$12 across multiple runs (initial
+  $3.83 sunk on app+t0-only deduplication, ~$8 on per-market re-runs).
+
 ## [0.9.0] - 2026-05-05
 
 Global AppTweak dataset + backtest consumers. Extends the Path B''' SEA-only

@@ -126,6 +126,26 @@ export interface BacktestOptions {
    * that have already frozen the cohort in a prior step.
    */
   existing_freeze?: { t0: number; market: OpportunityMarket; app_ids: string[] };
+  /**
+   * Per-signal prompt_version filter. When set, only signal_snapshots rows
+   * whose llm_prompt_version matches the configured value for their
+   * signal_name will be folded into the cohort's SignalValues. Used for
+   * market-specific signals like the AppTweak locGap (one row per
+   * (app, market, t0); the cohort filter selects the cohort's market).
+   *
+   * Signals not in the map are unfiltered — every row counts. Signals that
+   * appear with a value of `undefined` are also unfiltered.
+   */
+  signal_prompt_version_filter?: Readonly<Record<string, string>>;
+  /**
+   * Skip getFrozenCohortFeatures' post-t0-row leakage tripwire. Use ONLY
+   * for batch-precomputed multi-cohort runs (Path B' AppTweak experiment)
+   * where signal_snapshots holds a precomputed grid covering many
+   * (market, t0) cohorts. The SELECT cutoff (t<=t0) still applies; this
+   * only suppresses the upfront tripwire designed for the per-cohort
+   * production pipeline. See GetFrozenCohortFeaturesOptions.
+   */
+  skip_leakage_check?: boolean;
 }
 
 /**
@@ -234,7 +254,9 @@ export function runBacktest(db: Database, opts: BacktestOptions): BacktestReport
   // Read frozen features. Throws on leakage (post-t0 signal_snapshots row
   // for a frozen app). The throw is the leakage guarantee — if this line
   // returns, every row in `rows` has `t <= freeze.t0`.
-  const rows = getFrozenCohortFeatures(db, freeze);
+  const rows = getFrozenCohortFeatures(db, freeze, {
+    skip_leakage_check: opts.skip_leakage_check === true,
+  });
 
   // Assemble per-app SignalValues by picking the LATEST observation per
   // (app, signal). "Latest" honors the time cutoff because rows already
@@ -252,6 +274,12 @@ export function runBacktest(db: Database, opts: BacktestOptions): BacktestReport
     if (!schemaKey) continue; // not a v1 ranking signal (e.g., 'thesis', 'review_count')
     if (excluded.has(schemaKey)) continue; // ablation: drop this signal from the cohort
     if (r.value === null) continue; // null values can't enter the composer
+    // Per-signal prompt_version filter — selects market-aware signals (e.g.
+    // the AppTweak locGap fans out to one row per market under
+    // `v1.0.0-apptweak-{market}`; the cohort's market picks its own version).
+    // When the filter for this signal is undefined, every row counts.
+    const promptVersionFilter = opts.signal_prompt_version_filter?.[r.signal_name];
+    if (promptVersionFilter !== undefined && r.llm_prompt_version !== promptVersionFilter) continue;
     const prevT = slot.latestPerSignal.get(r.signal_name);
     if (prevT === undefined || r.t > prevT) {
       slot.signals[schemaKey] = r.value;

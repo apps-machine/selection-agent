@@ -242,7 +242,7 @@ for (const p of PULLS) {
   try {
     const body = await fetchChart(p, start, end);
     const rows = emitRows(p, body);
-    if (rows.length > 0) appendFileSync(OUT_TSV, rows.join("\n") + "\n");
+    if (rows.length > 0) appendFileSync(OUT_TSV, `${rows.join("\n")}\n`);
     const cost = body.metadata?.request?.cost ?? 0;
     totalCost += cost;
     totalRows += rows.length;

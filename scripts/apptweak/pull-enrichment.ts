@@ -288,7 +288,7 @@ for (const t0 of T0S) {
               t0,
               raw: payload,
             };
-            appendFileSync(META_OUT, JSON.stringify(rec) + "\n");
+            appendFileSync(META_OUT, `${JSON.stringify(rec)}\n`);
             succeeded += 1;
           }
         }
@@ -335,7 +335,7 @@ for (const t0 of T0S) {
               t0,
               raw: payload,
             };
-            appendFileSync(METRICS_OUT, JSON.stringify(rec) + "\n");
+            appendFileSync(METRICS_OUT, `${JSON.stringify(rec)}\n`);
             succeeded += 1;
           }
         }

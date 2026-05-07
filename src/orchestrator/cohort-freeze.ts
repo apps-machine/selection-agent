@@ -112,6 +112,28 @@ export function freezeCohort(
 }
 
 /**
+ * Options for getFrozenCohortFeatures. Reserved for opt-outs that should
+ * be deliberate, not defaults — like skipping the leakage detection in
+ * batch-precomputed multi-cohort runs.
+ */
+export type GetFrozenCohortFeaturesOptions = {
+  /**
+   * Skip the post-t0-row leakage check. Use ONLY when signal_snapshots
+   * was populated as a batch-precomputed grid covering many (market, t0)
+   * cohorts at once (e.g., the Path B' AppTweak experiment), where the
+   * presence of t > t0 rows is expected — they belong to FUTURE cohorts
+   * for the same app, not leakage. The SELECT below still honors the
+   * t<=t0 cutoff regardless, so disabling the check does not introduce
+   * leakage at the read layer; it only suppresses the bug-detection
+   * tripwire designed for the per-cohort production pipeline.
+   *
+   * Default: false. The check is mandatory for production pipelines so
+   * a faulty signal-write code path surfaces as a clear error.
+   */
+  skip_leakage_check?: boolean;
+};
+
+/**
  * Read the cohort's signal features as observed at or before `freeze.t0`.
  *
  * Leakage detection: this function FIRST checks whether any
@@ -122,24 +144,34 @@ export function freezeCohort(
  * date, and even though we'd discard it for THIS read, the row's
  * existence indicates the upstream pipeline isn't honoring the cutoff.
  * Better to surface that bug now than to ship silent results.
+ *
+ * Set `opts.skip_leakage_check = true` for batch-precomputed multi-cohort
+ * runs (see GetFrozenCohortFeaturesOptions). The SELECT cutoff (t<=t0) is
+ * always applied; the option only skips the upfront tripwire.
  */
-export function getFrozenCohortFeatures(db: Database, freeze: CohortFreeze): SignalSnapshotRow[] {
+export function getFrozenCohortFeatures(
+  db: Database,
+  freeze: CohortFreeze,
+  opts: GetFrozenCohortFeaturesOptions = {},
+): SignalSnapshotRow[] {
   if (freeze.app_ids.length === 0) {
     return [];
   }
   const placeholders = freeze.app_ids.map(() => "?").join(",");
 
-  // Leakage detection: any post-t0 row for our frozen apps is a bug.
-  const leakageRow = db
-    .prepare<{ count: number }, (string | number)[]>(
-      `SELECT COUNT(*) AS count FROM signal_snapshots
-       WHERE app_id IN (${placeholders}) AND t > ?`,
-    )
-    .get(...freeze.app_ids, freeze.t0);
-  if (leakageRow && leakageRow.count > 0) {
-    throw new Error(
-      `getFrozenCohortFeatures: detected ${leakageRow.count} signal_snapshots row(s) with t > t0=${freeze.t0} for frozen cohort (market=${freeze.market}). Backtest leakage — fix the signal pipeline cutoff before retrying.`,
-    );
+  if (!opts.skip_leakage_check) {
+    // Leakage detection: any post-t0 row for our frozen apps is a bug.
+    const leakageRow = db
+      .prepare<{ count: number }, (string | number)[]>(
+        `SELECT COUNT(*) AS count FROM signal_snapshots
+         WHERE app_id IN (${placeholders}) AND t > ?`,
+      )
+      .get(...freeze.app_ids, freeze.t0);
+    if (leakageRow && leakageRow.count > 0) {
+      throw new Error(
+        `getFrozenCohortFeatures: detected ${leakageRow.count} signal_snapshots row(s) with t > t0=${freeze.t0} for frozen cohort (market=${freeze.market}). Backtest leakage — fix the signal pipeline cutoff before retrying.`,
+      );
+    }
   }
 
   return db
