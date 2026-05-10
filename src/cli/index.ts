@@ -7,6 +7,12 @@ import { buildShortlist, defaultAnthropicLlmClient } from "../path-e/build-short
 import { runSnapshot } from "../velocity/run-snapshot.ts";
 import { runAudit } from "./audit.ts";
 import { renderBanner, VERSION } from "./banner.ts";
+import {
+  DossierInputError,
+  DossierNotFoundError,
+  DossierWriteError,
+  runDossier,
+} from "./dossier.ts";
 import { formatError } from "./errors.ts";
 import { RiskCheckInputError, runRiskCheck } from "./risk-check.ts";
 
@@ -420,6 +426,161 @@ const main = defineCommand({
               cause: "runRiskCheck threw before producing a result.",
               fix: "Check that --shortlist and --thresholds point at readable files containing valid JSON.",
               docs: "docs/runbooks/Runbook-Discovery.md § Stage 3",
+            }),
+          );
+          process.exit(1);
+        }
+      },
+    }),
+    dossier: defineCommand({
+      meta: {
+        name: "dossier",
+        description:
+          "Stage 5 discovery dossier generator (Runbook-Discovery). Reads a shortlist JSON + a candidate ref (<app_id>:<store>) and writes a populated dossier markdown file ready for the operator to fill subjective sections + sign GO/NO-GO. Supported template tokens: {{slug}}, {{date}}, {{shortlist_source}}, {{candidate.app_id}}, {{candidate.store}}, {{candidate.title}}, {{candidate.publisher_name}}, {{candidate.publisher_app_count}}, {{candidate.dna_class}}, {{candidate.dna_subclass}}, {{candidate.markets_active}}, {{candidate.tenure_days_max}}, {{candidate.best_rank}}, {{candidate.has_subscription_iap}}, {{candidate.iap_count}}, {{candidate.score}}, {{candidate.clonability_hypothesis}}.",
+      },
+      args: {
+        shortlist: {
+          type: "string",
+          description: "Path to the shortlist JSON (output of `selection-agent shortlist`).",
+          required: true,
+        },
+        candidate: {
+          type: "string",
+          description:
+            "Candidate reference in the form `<app_id>:<store>` (e.g. 544007664:apple, com.example.app:googleplay).",
+          required: true,
+        },
+        slug: {
+          type: "string",
+          description: "Short brand slug used in the dossier title and the default filename.",
+          required: true,
+        },
+        template: {
+          type: "string",
+          description:
+            "Optional path to a user-supplied dossier template (markdown with {{token}} placeholders).",
+        },
+        output: {
+          type: "string",
+          description:
+            "Output path for the dossier. Defaults to `<slug>-dossier-<YYYY-MM-DD>.md` in the current directory.",
+        },
+      },
+      run({ args }) {
+        const shortlistPath = typeof args.shortlist === "string" ? args.shortlist : "";
+        const candidateRef = typeof args.candidate === "string" ? args.candidate : "";
+        const slug = typeof args.slug === "string" ? args.slug : "";
+        const templatePath =
+          typeof args.template === "string" && args.template ? args.template : undefined;
+        const output = typeof args.output === "string" && args.output ? args.output : undefined;
+
+        if (!shortlistPath) {
+          console.error(
+            formatError({
+              code: "MISSING_SHORTLIST",
+              message: "--shortlist is required",
+              cause: "dossier needs a shortlist JSON to populate the candidate section.",
+              fix: "rerun with --shortlist <path-to-shortlist.json>",
+              docs: "docs/runbooks/Runbook-Discovery.md § Stage 5",
+            }),
+          );
+          process.exit(2);
+        }
+        if (!candidateRef) {
+          console.error(
+            formatError({
+              code: "MISSING_CANDIDATE",
+              message: "--candidate is required",
+              cause: "dossier needs a candidate ref `<app_id>:<store>` to look up.",
+              fix: "rerun with --candidate <app_id>:<store> (e.g. 544007664:apple)",
+              docs: "docs/runbooks/Runbook-Discovery.md § Stage 5",
+            }),
+          );
+          process.exit(2);
+        }
+        if (!slug) {
+          console.error(
+            formatError({
+              code: "MISSING_SLUG",
+              message: "--slug is required",
+              cause: "dossier needs a slug for the title heading + default filename.",
+              fix: "rerun with --slug <name> (e.g. tidyphone)",
+              docs: "docs/runbooks/Runbook-Discovery.md § Stage 5",
+            }),
+          );
+          process.exit(2);
+        }
+
+        try {
+          const result = runDossier({
+            shortlistPath,
+            candidateRef,
+            slug,
+            templatePath,
+            output,
+          });
+          if (result.dossierPath) {
+            process.stdout.write(`Wrote ${result.dossierPath}\n`);
+          }
+          process.exit(result.exitCode);
+        } catch (err) {
+          if (err instanceof DossierInputError) {
+            console.error(
+              formatError({
+                code: err.code,
+                message: err.message,
+                cause: "dossier input validation failed before generation.",
+                fix: "Fix the offending file path or JSON, then rerun.",
+                docs: "docs/runbooks/Runbook-Discovery.md § Stage 5",
+              }),
+            );
+            process.exit(2);
+          }
+          if (err instanceof DossierNotFoundError) {
+            console.error(
+              formatError({
+                code: err.code,
+                message: err.message,
+                cause: "The candidate ref did not match any row in the shortlist.",
+                fix: "Inspect the shortlist JSON and pick an existing `<app_id>:<store>` pair.",
+                docs: "docs/runbooks/Runbook-Discovery.md § Stage 5",
+              }),
+            );
+            process.exit(1);
+          }
+          if (err instanceof DossierWriteError) {
+            console.error(
+              formatError({
+                code: err.code,
+                message: err.message,
+                cause: "Output path could not be written.",
+                fix: "Check that the parent directory exists and is writable, then rerun.",
+                docs: "docs/runbooks/Runbook-Discovery.md § Stage 5",
+              }),
+            );
+            process.exit(1);
+          }
+          // Unrecognized: ref-parse failure (Error from parseCandidateRef) or unexpected.
+          const message = err instanceof Error ? err.message : String(err);
+          if (/candidate ref/.test(message)) {
+            console.error(
+              formatError({
+                code: "INVALID_CANDIDATE",
+                message,
+                cause: "--candidate must be `<app_id>:<store>` with store ∈ apple|googleplay.",
+                fix: "rerun with --candidate <app_id>:<store> (e.g. 544007664:apple)",
+                docs: "docs/runbooks/Runbook-Discovery.md § Stage 5",
+              }),
+            );
+            process.exit(2);
+          }
+          console.error(
+            formatError({
+              code: "DOSSIER_FAILED",
+              message,
+              cause: "runDossier threw before writing the dossier.",
+              fix: "Check that --shortlist points at a valid shortlist JSON and --slug is non-empty.",
+              docs: "docs/runbooks/Runbook-Discovery.md § Stage 5",
             }),
           );
           process.exit(1);

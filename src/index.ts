@@ -7,6 +7,15 @@
  */
 
 export {
+  buildDossier,
+  DEFAULT_DOSSIER_TEMPLATE,
+  type DossierOpts,
+  findCandidate,
+  parseCandidateRef,
+  type Shortlist,
+  type ShortlistCandidate,
+} from "./path-e/dossier.ts";
+export {
   type AnnotatedCandidate,
   type AnnotatedShortlist,
   type CheckName,
