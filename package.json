@@ -6,9 +6,11 @@
   "bin": {
     "selection-agent": "./src/cli/index.ts"
   },
-  "main": "./src/cli/index.ts",
+  "main": "./src/index.ts",
   "files": [
+    "src/index.ts",
     "src/cli",
+    "src/path-e",
     "src/scrapers",
     "src/judges",
     "src/scoring",

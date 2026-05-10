@@ -8,6 +8,7 @@ import { runSnapshot } from "../velocity/run-snapshot.ts";
 import { runAudit } from "./audit.ts";
 import { renderBanner, VERSION } from "./banner.ts";
 import { formatError } from "./errors.ts";
+import { RiskCheckInputError, runRiskCheck } from "./risk-check.ts";
 
 function parseList(v: unknown): string[] | undefined {
   if (typeof v !== "string" || v.length === 0) return undefined;
@@ -307,6 +308,118 @@ const main = defineCommand({
               cause: "buildShortlist threw before producing a shortlist.",
               fix: "Check the DB path, the metadata.jsonl path, and (if not --no-llm) your ANTHROPIC_API_KEY.",
               docs: "docs/runbooks/Runbook-Discovery.md § Stage 2",
+            }),
+          );
+          process.exit(1);
+        }
+      },
+    }),
+    "risk-check": defineCommand({
+      meta: {
+        name: "risk-check",
+        description:
+          "Stage 3 risk-threshold annotator (Runbook-Discovery). Reads a shortlist JSON + a thresholds JSON, evaluates 5 checks (markets_spread, tenure, subscription_iap, supported_markets, clonable_dna) per candidate, and emits annotated JSON or CSV. Exits 0 if any candidate PASSes, 1 if none, 2 on bad input.",
+      },
+      args: {
+        shortlist: {
+          type: "string",
+          description: "Path to the shortlist JSON (output of `selection-agent shortlist`).",
+          required: true,
+        },
+        thresholds: {
+          type: "string",
+          description:
+            "Path to the thresholds JSON file. Partial JSON is fine — defaults fill in missing fields.",
+          required: true,
+        },
+        output: {
+          type: "string",
+          description:
+            "Write the annotated payload to this path. If omitted, output goes to stdout.",
+        },
+        format: {
+          type: "string",
+          description: "Output format: json | csv (default: json).",
+          default: "json",
+        },
+      },
+      run({ args }) {
+        const shortlistPath = typeof args.shortlist === "string" ? args.shortlist : "";
+        const thresholdsPath = typeof args.thresholds === "string" ? args.thresholds : "";
+        const output = typeof args.output === "string" && args.output ? args.output : undefined;
+        const formatRaw = typeof args.format === "string" ? args.format : "json";
+        if (formatRaw !== "json" && formatRaw !== "csv") {
+          console.error(
+            formatError({
+              code: "INVALID_FORMAT",
+              message: `unknown --format value "${formatRaw}"`,
+              cause: "--format accepts 'json' or 'csv'",
+              fix: "rerun with --format json (default) or --format csv",
+              docs: "docs/runbooks/Runbook-Discovery.md § Stage 3",
+            }),
+          );
+          process.exit(2);
+        }
+        if (!shortlistPath) {
+          console.error(
+            formatError({
+              code: "MISSING_SHORTLIST",
+              message: "--shortlist is required",
+              cause: "risk-check needs a shortlist JSON to annotate.",
+              fix: "rerun with --shortlist <path-to-shortlist.json>",
+              docs: "docs/runbooks/Runbook-Discovery.md § Stage 3",
+            }),
+          );
+          process.exit(2);
+        }
+        if (!thresholdsPath) {
+          console.error(
+            formatError({
+              code: "MISSING_THRESHOLDS",
+              message: "--thresholds is required",
+              cause: "risk-check needs a thresholds JSON to evaluate against.",
+              fix: "rerun with --thresholds <path-to-thresholds.json>",
+              docs: "docs/runbooks/Runbook-Discovery.md § Stage 3",
+            }),
+          );
+          process.exit(2);
+        }
+        try {
+          const result = runRiskCheck({
+            shortlistPath,
+            thresholdsPath,
+            output,
+            format: formatRaw,
+          });
+          if (!output) {
+            process.stdout.write(result.body);
+          } else {
+            process.stdout.write(
+              `risk-check: ${result.annotated.summary.pass} PASS, ${result.annotated.summary.warn} WARN, ${result.annotated.summary.fail} FAIL (of ${result.annotated.summary.total}). Wrote ${output}\n`,
+            );
+          }
+          process.exit(result.exitCode);
+        } catch (err) {
+          if (err instanceof RiskCheckInputError) {
+            console.error(
+              formatError({
+                code: err.code,
+                message: err.message,
+                cause: "risk-check input validation failed before evaluation.",
+                fix: "Fix the offending file (or pass `{}` for thresholds to use defaults), then rerun.",
+                docs: "docs/runbooks/Runbook-Discovery.md § Stage 3",
+              }),
+            );
+            process.exit(2);
+          }
+          const message = err instanceof Error ? err.message : String(err);
+          console.error(
+            formatError({
+              code: "RISK_CHECK_FAILED",
+              message,
+              cause: "runRiskCheck threw before producing a result.",
+              fix: "Check that --shortlist and --thresholds point at readable files containing valid JSON.",
+              docs: "docs/runbooks/Runbook-Discovery.md § Stage 3",
             }),
           );
           process.exit(1);

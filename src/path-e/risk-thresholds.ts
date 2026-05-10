@@ -95,18 +95,14 @@ export const RiskThresholdsSchema = z.object({
    * `markets_active` are in this set; WARNs if some are outside; FAILs if
    * none are. Defaults to the tier-2 SEA cluster + tier-1 mature markets.
    */
-  supportedMarkets: z
-    .array(z.string().length(2))
-    .default([...DEFAULT_SUPPORTED_MARKETS]),
+  supportedMarkets: z.array(z.string().length(2)).default([...DEFAULT_SUPPORTED_MARKETS]),
 
   /**
    * DNA classes the operator considers clonable. Defaults to the union of
    * the shortlist pipeline's CLONABLE_AUTO + CLONABLE_REVIEW sets. A
    * candidate FAILs if its `dna_class` is null or not in this set.
    */
-  clonableDnaClasses: z
-    .array(z.string())
-    .default([...DEFAULT_CLONABLE_DNA_CLASSES]),
+  clonableDnaClasses: z.array(z.string()).default([...DEFAULT_CLONABLE_DNA_CLASSES]),
 });
 
 export type RiskThresholds = z.infer<typeof RiskThresholdsSchema>;

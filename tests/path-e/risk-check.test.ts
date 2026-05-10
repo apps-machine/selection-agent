@@ -50,9 +50,7 @@ describe("RiskThresholdsSchema", () => {
   });
 
   test("rejects invalid market codes (length != 2)", () => {
-    expect(() =>
-      RiskThresholdsSchema.parse({ supportedMarkets: ["usa", "id"] }),
-    ).toThrow();
+    expect(() => RiskThresholdsSchema.parse({ supportedMarkets: ["usa", "id"] })).toThrow();
   });
 
   test("rejects out-of-range maxConcurrentMarkets", () => {
@@ -243,7 +241,7 @@ describe("evaluateShortlist", () => {
     cand.score = 0.93;
     cand.title = "X1";
     const r = evaluateShortlist([cand], DEFAULTS);
-    const annotated = r.candidates[0] as typeof cand & {
+    const annotated = r.candidates[0] as unknown as typeof cand & {
       risk_check: { overall: string };
     };
     expect(annotated.score).toBe(0.93);

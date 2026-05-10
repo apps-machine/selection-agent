@@ -69,10 +69,7 @@ export interface AnnotatedShortlist {
   candidates: AnnotatedCandidate[];
 }
 
-function checkMarketsSpread(
-  c: RiskCheckCandidate,
-  t: RiskThresholds,
-): RiskCheck {
+function checkMarketsSpread(c: RiskCheckCandidate, t: RiskThresholds): RiskCheck {
   const n = c.markets_active.length;
   if (n >= t.maxConcurrentMarkets) {
     return {
@@ -103,10 +100,7 @@ function checkTenure(c: RiskCheckCandidate, t: RiskThresholds): RiskCheck {
   };
 }
 
-function checkSubscriptionIap(
-  c: RiskCheckCandidate,
-  t: RiskThresholds,
-): RiskCheck {
+function checkSubscriptionIap(c: RiskCheckCandidate, t: RiskThresholds): RiskCheck {
   if (!t.requireSubscriptionIap) {
     return {
       name: "subscription_iap",
@@ -128,10 +122,7 @@ function checkSubscriptionIap(
   };
 }
 
-function checkSupportedMarkets(
-  c: RiskCheckCandidate,
-  t: RiskThresholds,
-): RiskCheck {
+function checkSupportedMarkets(c: RiskCheckCandidate, t: RiskThresholds): RiskCheck {
   const supported = new Set(t.supportedMarkets.map((m) => m.toLowerCase()));
   const active = c.markets_active.map((m) => m.toLowerCase());
   if (active.length === 0) {
@@ -164,10 +155,7 @@ function checkSupportedMarkets(
   };
 }
 
-function checkClonableDna(
-  c: RiskCheckCandidate,
-  t: RiskThresholds,
-): RiskCheck {
+function checkClonableDna(c: RiskCheckCandidate, t: RiskThresholds): RiskCheck {
   const allowed = new Set(t.clonableDnaClasses);
   if (c.dna_class && allowed.has(c.dna_class)) {
     return {
