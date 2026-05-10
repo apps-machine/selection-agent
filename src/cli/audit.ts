@@ -17,10 +17,10 @@
  */
 
 import { Database } from "bun:sqlite";
-import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { gunzipSync } from "node:zlib";
 import pino from "pino";
+import { resolveMetadataPath } from "../path-e/metadata-path.ts";
 import { runMigrations } from "../storage/schema.ts";
 import {
   type CheckResult,
@@ -260,48 +260,7 @@ export function defaultMetadataReader(
   };
 }
 
-/**
- * Resolve the metadata file path:
- *   - explicit `metadataPath` wins (auto-decompresses if `.gz`)
- *   - else glob `<dataRoot>/data/apptweak-*` directories, sort by name desc,
- *     return the first that has `metadata.jsonl[.gz]`
- *   - else null (no dossier present)
- *
- * Exported for tests; not part of the package's public API surface.
- */
-export function resolveMetadataPath(
-  opts: { metadataPath?: string; dataRoot?: string } = {},
-): string | null {
-  if (opts.metadataPath) {
-    return existsSync(opts.metadataPath) ? opts.metadataPath : null;
-  }
-  const root = opts.dataRoot ?? process.cwd();
-  const dataDir = join(root, "data");
-  if (!existsSync(dataDir)) return null;
-  let entries: string[];
-  try {
-    entries = readdirSync(dataDir);
-  } catch {
-    return null;
-  }
-  // Sort descending so the latest dated directory wins.
-  const candidates = entries
-    .filter((name) => name.startsWith("apptweak-"))
-    .filter((name) => {
-      try {
-        return statSync(join(dataDir, name)).isDirectory();
-      } catch {
-        return false;
-      }
-    })
-    .sort()
-    .reverse();
-  for (const name of candidates) {
-    const dir = join(dataDir, name);
-    const jsonl = join(dir, "metadata.jsonl");
-    if (existsSync(jsonl)) return jsonl;
-    const gz = join(dir, "metadata.jsonl.gz");
-    if (existsSync(gz)) return gz;
-  }
-  return null;
-}
+// Re-export for backward compatibility — tests import resolveMetadataPath
+// from this module. The implementation has moved to src/path-e/metadata-path.ts
+// since it is now shared between the audit and shortlist subcommands.
+export { resolveMetadataPath } from "../path-e/metadata-path.ts";
