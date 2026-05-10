@@ -145,7 +145,7 @@ const main = defineCommand({
               message,
               cause: "--markets must be a comma-separated list of ISO alpha-2 codes.",
               fix: "rerun with --markets bd,th,vn,my,id (default) or another cluster",
-              docs: "docs/runbooks/Runbook-Discovery.md § Stage 1",
+              docs: "docs/discovery-methodology.md § Stage 1",
             }),
           );
           process.exit(2);
@@ -169,7 +169,7 @@ const main = defineCommand({
               message,
               cause: "Audit threw before producing a report.",
               fix: "Check that the DB path is readable and that the schema matches the package version.",
-              docs: "docs/runbooks/Runbook-Discovery.md § Stage 1",
+              docs: "docs/discovery-methodology.md § Stage 1",
             }),
           );
           process.exit(1);
@@ -230,7 +230,7 @@ const main = defineCommand({
               message,
               cause: "--markets must be a comma-separated list of ISO alpha-2 codes.",
               fix: "rerun with --markets id,vn,th,my,bd (default) or another cluster",
-              docs: "docs/runbooks/Runbook-Discovery.md § Stage 2",
+              docs: "docs/discovery-methodology.md § Stage 2",
             }),
           );
           process.exit(2);
@@ -251,7 +251,7 @@ const main = defineCommand({
                 message: `--shortlist-size must be a positive integer, got "${rawSize}"`,
                 cause: "The final shortlist is truncated to this many rows.",
                 fix: "rerun with --shortlist-size 50 (default) or another positive integer",
-                docs: "docs/runbooks/Runbook-Discovery.md § Stage 2",
+                docs: "docs/discovery-methodology.md § Stage 2",
               }),
             );
             process.exit(2);
@@ -273,7 +273,7 @@ const main = defineCommand({
                 "Or skip the LLM step entirely:",
                 "     npx @apps-machine/selection-agent shortlist --no-llm",
               ],
-              docs: "docs/runbooks/Runbook-Discovery.md § Stage 2",
+              docs: "docs/discovery-methodology.md § Stage 2",
             }),
           );
           process.exit(2);
@@ -313,7 +313,7 @@ const main = defineCommand({
               message,
               cause: "buildShortlist threw before producing a shortlist.",
               fix: "Check the DB path, the metadata.jsonl path, and (if not --no-llm) your ANTHROPIC_API_KEY.",
-              docs: "docs/runbooks/Runbook-Discovery.md § Stage 2",
+              docs: "docs/discovery-methodology.md § Stage 2",
             }),
           );
           process.exit(1);
@@ -361,7 +361,7 @@ const main = defineCommand({
               message: `unknown --format value "${formatRaw}"`,
               cause: "--format accepts 'json' or 'csv'",
               fix: "rerun with --format json (default) or --format csv",
-              docs: "docs/runbooks/Runbook-Discovery.md § Stage 3",
+              docs: "docs/discovery-methodology.md § Stage 3",
             }),
           );
           process.exit(2);
@@ -373,7 +373,7 @@ const main = defineCommand({
               message: "--shortlist is required",
               cause: "risk-check needs a shortlist JSON to annotate.",
               fix: "rerun with --shortlist <path-to-shortlist.json>",
-              docs: "docs/runbooks/Runbook-Discovery.md § Stage 3",
+              docs: "docs/discovery-methodology.md § Stage 3",
             }),
           );
           process.exit(2);
@@ -385,7 +385,7 @@ const main = defineCommand({
               message: "--thresholds is required",
               cause: "risk-check needs a thresholds JSON to evaluate against.",
               fix: "rerun with --thresholds <path-to-thresholds.json>",
-              docs: "docs/runbooks/Runbook-Discovery.md § Stage 3",
+              docs: "docs/discovery-methodology.md § Stage 3",
             }),
           );
           process.exit(2);
@@ -413,7 +413,7 @@ const main = defineCommand({
                 message: err.message,
                 cause: "risk-check input validation failed before evaluation.",
                 fix: "Fix the offending file (or pass `{}` for thresholds to use defaults), then rerun.",
-                docs: "docs/runbooks/Runbook-Discovery.md § Stage 3",
+                docs: "docs/discovery-methodology.md § Stage 3",
               }),
             );
             process.exit(2);
@@ -425,7 +425,7 @@ const main = defineCommand({
               message,
               cause: "runRiskCheck threw before producing a result.",
               fix: "Check that --shortlist and --thresholds point at readable files containing valid JSON.",
-              docs: "docs/runbooks/Runbook-Discovery.md § Stage 3",
+              docs: "docs/discovery-methodology.md § Stage 3",
             }),
           );
           process.exit(1);
@@ -481,7 +481,7 @@ const main = defineCommand({
               message: "--shortlist is required",
               cause: "dossier needs a shortlist JSON to populate the candidate section.",
               fix: "rerun with --shortlist <path-to-shortlist.json>",
-              docs: "docs/runbooks/Runbook-Discovery.md § Stage 5",
+              docs: "docs/discovery-methodology.md § Stage 5",
             }),
           );
           process.exit(2);
@@ -493,7 +493,7 @@ const main = defineCommand({
               message: "--candidate is required",
               cause: "dossier needs a candidate ref `<app_id>:<store>` to look up.",
               fix: "rerun with --candidate <app_id>:<store> (e.g. 544007664:apple)",
-              docs: "docs/runbooks/Runbook-Discovery.md § Stage 5",
+              docs: "docs/discovery-methodology.md § Stage 5",
             }),
           );
           process.exit(2);
@@ -505,7 +505,7 @@ const main = defineCommand({
               message: "--slug is required",
               cause: "dossier needs a slug for the title heading + default filename.",
               fix: "rerun with --slug <name> (e.g. tidyphone)",
-              docs: "docs/runbooks/Runbook-Discovery.md § Stage 5",
+              docs: "docs/discovery-methodology.md § Stage 5",
             }),
           );
           process.exit(2);
@@ -531,7 +531,7 @@ const main = defineCommand({
                 message: err.message,
                 cause: "dossier input validation failed before generation.",
                 fix: "Fix the offending file path or JSON, then rerun.",
-                docs: "docs/runbooks/Runbook-Discovery.md § Stage 5",
+                docs: "docs/discovery-methodology.md § Stage 5",
               }),
             );
             process.exit(2);
@@ -543,7 +543,7 @@ const main = defineCommand({
                 message: err.message,
                 cause: "The candidate ref did not match any row in the shortlist.",
                 fix: "Inspect the shortlist JSON and pick an existing `<app_id>:<store>` pair.",
-                docs: "docs/runbooks/Runbook-Discovery.md § Stage 5",
+                docs: "docs/discovery-methodology.md § Stage 5",
               }),
             );
             process.exit(1);
@@ -555,7 +555,7 @@ const main = defineCommand({
                 message: err.message,
                 cause: "Output path could not be written.",
                 fix: "Check that the parent directory exists and is writable, then rerun.",
-                docs: "docs/runbooks/Runbook-Discovery.md § Stage 5",
+                docs: "docs/discovery-methodology.md § Stage 5",
               }),
             );
             process.exit(1);
@@ -569,7 +569,7 @@ const main = defineCommand({
                 message,
                 cause: "--candidate must be `<app_id>:<store>` with store ∈ apple|googleplay.",
                 fix: "rerun with --candidate <app_id>:<store> (e.g. 544007664:apple)",
-                docs: "docs/runbooks/Runbook-Discovery.md § Stage 5",
+                docs: "docs/discovery-methodology.md § Stage 5",
               }),
             );
             process.exit(2);
@@ -580,7 +580,7 @@ const main = defineCommand({
               message,
               cause: "runDossier threw before writing the dossier.",
               fix: "Check that --shortlist points at a valid shortlist JSON and --slug is non-empty.",
-              docs: "docs/runbooks/Runbook-Discovery.md § Stage 5",
+              docs: "docs/discovery-methodology.md § Stage 5",
             }),
           );
           process.exit(1);

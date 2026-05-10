@@ -481,9 +481,12 @@ export async function buildShortlist(opts: ShortlistOpts = {}): Promise<Shortlis
     opts.trailingYearStartMs ?? Date.parse(DEFAULT_TRAILING_YEAR_START_ISO);
   const recent30dStartMs = dataEndMs - 30 * 86_400_000;
   const now = opts.now ?? Date.now();
+  // Default to "warn" so structured JSON logs don't leak to stderr (and don't
+  // expose the user's hostname/pid) on every CLI run. End-users opt in to
+  // verbose logs via LOG_LEVEL=info or LOG_LEVEL=debug.
   const logger = pino({
     name: "build-shortlist",
-    level: opts.silent ? "silent" : (process.env.LOG_LEVEL ?? "info"),
+    level: opts.silent ? "silent" : (process.env.LOG_LEVEL ?? "warn"),
   });
 
   if (!skipLLM && !opts.llmClient) {

@@ -5,7 +5,7 @@
  * a Markdown report. Exits 0 if all checks PASS or WARN; exits 1 if any
  * check FAILs.
  *
- * The runbook (`docs/runbooks/Runbook-Discovery.md` Stage 1) documents this
+ * The runbook (`docs/discovery-methodology.md` Stage 1) documents this
  * step as MANDATORY before any discovery cycle runs. Prior Path B and Path C
  * cycles each shipped on flawed inputs that 5 SQL queries would have caught.
  *
@@ -79,9 +79,12 @@ export async function runAudit(opts: AuditOpts = {}): Promise<AuditResult> {
   const dbPath = opts.dbPath ?? "./.cache/selection-agent.sqlite";
   const markets = opts.markets ?? DEFAULT_AUDIT_MARKETS;
   const now = opts.now ?? Date.now();
+  // Default to "warn" so structured JSON logs don't leak to stderr (and don't
+  // expose the user's hostname/pid) on every CLI run. End-users opt in to
+  // verbose logs via LOG_LEVEL=info or LOG_LEVEL=debug.
   const logger = pino({
     name: "selection-agent-audit",
-    level: opts.silent ? "silent" : (process.env.LOG_LEVEL ?? "info"),
+    level: opts.silent ? "silent" : (process.env.LOG_LEVEL ?? "warn"),
   });
 
   if (!existsSync(dbPath)) {

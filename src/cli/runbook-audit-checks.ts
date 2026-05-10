@@ -9,7 +9,7 @@
  * tests/cli/runbook-audit-checks.test.ts). The CLI module composes them and
  * formats the final markdown report.
  *
- * Source of truth for thresholds: docs/runbooks/Runbook-Discovery.md Stage 1.
+ * Source of truth for thresholds: docs/discovery-methodology.md Stage 1.
  */
 
 import type { Database } from "bun:sqlite";
@@ -314,7 +314,7 @@ export function checkAppInvariantsCoverage(db: Database): CheckResult {
 
   const fix =
     status === "FAIL"
-      ? " — run `bun run packages/selection-agent/scripts/path-c/import-app-invariants.ts` to ingest"
+      ? " — populate the app_invariants table from your metadata provider (see docs/discovery-methodology.md § Stage 1 for schema + ingest pattern)"
       : "";
   return {
     name: "app_invariants coverage",

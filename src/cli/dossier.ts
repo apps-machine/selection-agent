@@ -114,9 +114,12 @@ function loadShortlist(path: string): Shortlist | ShortlistCandidate[] {
  */
 export function runDossier(opts: DossierCliOpts): DossierCliResult {
   const now = opts.now ?? new Date();
+  // Default to "warn" so structured JSON logs don't leak to stderr (and don't
+  // expose the user's hostname/pid) on every CLI run. End-users opt in to
+  // verbose logs via LOG_LEVEL=info or LOG_LEVEL=debug.
   const logger = pino({
     name: "selection-agent-dossier",
-    level: opts.silent ? "silent" : (process.env.LOG_LEVEL ?? "info"),
+    level: opts.silent ? "silent" : (process.env.LOG_LEVEL ?? "warn"),
   });
 
   const { app_id, store } = parseCandidateRef(opts.candidateRef);
