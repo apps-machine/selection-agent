@@ -145,10 +145,7 @@ interface CellFactorScores {
   f4: number | null;
 }
 
-function computeCellFactors(
-  db: Database,
-  cohort: CohortSpec,
-): Map<string, CellFactorScores> {
+function computeCellFactors(db: Database, cohort: CohortSpec): Map<string, CellFactorScores> {
   // Cohort apps: rank ≤ 100 in (market, store, top_grossing_overall) within [t0-6d, t0]
   const cohortStart = cohort.t0_ms - 6 * DAY_MS;
   const cohortEnd = cohort.t0_ms;
@@ -181,16 +178,15 @@ function computeCellFactors(
 
   // F1: tenure_365d. distinct days at rank ≤ 100 in [tenureStart, t0]
   const tenureRows = db
-    .prepare<
-      { app_id: string; days: number },
-      [string, Store, number, number, ...string[]]
-    >(
+    .prepare<{ app_id: string; days: number }, [string, Store, number, number, ...string[]]>(
       `SELECT app_id, COUNT(DISTINCT date(captured_at/1000, 'unixepoch')) AS days
        FROM chart_snapshots
        WHERE market = ? AND store = ? AND category = '${CATEGORY}'
          AND captured_at BETWEEN ? AND ?
          AND rank <= 100
-         AND app_id IN (${Array.from(cohortApps.keys()).map(() => "?").join(",")})
+         AND app_id IN (${Array.from(cohortApps.keys())
+           .map(() => "?")
+           .join(",")})
        GROUP BY app_id`,
     )
     .all(cohort.market, cohort.store, tenureStart, cohortEnd, ...cohortApps.keys());
@@ -218,7 +214,9 @@ function computeCellFactors(
        FROM chart_snapshots
        WHERE market = ? AND store = ? AND category = '${CATEGORY}'
          AND captured_at BETWEEN ? AND ?
-         AND app_id IN (${Array.from(cohortApps.keys()).map(() => "?").join(",")})
+         AND app_id IN (${Array.from(cohortApps.keys())
+           .map(() => "?")
+           .join(",")})
        GROUP BY app_id`,
     )
     .all(cohort.market, cohort.store, stab90Start, cohortEnd, ...cohortApps.keys());
@@ -265,11 +263,7 @@ function computeCellFactors(
 // because the v3 doc defines breadth as "across markets where app holds
 // top-100 slots", which is a measure of PMF independent of cohort design.
 
-function computeF5(
-  db: Database,
-  appsInCohort: Set<string>,
-  t0_ms: number,
-): Map<string, number> {
+function computeF5(db: Database, appsInCohort: Set<string>, t0_ms: number): Map<string, number> {
   const cohortStart = t0_ms - 6 * DAY_MS;
   const cohortEnd = t0_ms;
   // For perf: query just the apps we care about across all (market, store).
@@ -277,10 +271,7 @@ function computeF5(
   if (appList.length === 0) return new Map();
 
   const rows = db
-    .prepare<
-      { app_id: string; cells: number },
-      [number, number, ...string[]]
-    >(
+    .prepare<{ app_id: string; cells: number }, [number, number, ...string[]]>(
       `SELECT app_id, COUNT(DISTINCT market || '|' || store) AS cells
        FROM chart_snapshots
        WHERE category = '${CATEGORY}'
@@ -350,10 +341,7 @@ function computeF14ForCohort(
   if (apps.length === 0) return new Map();
 
   const rows = db
-    .prepare<
-      { app_id: string },
-      [string, Store, number, number, ...string[]]
-    >(
+    .prepare<{ app_id: string }, [string, Store, number, number, ...string[]]>(
       `SELECT DISTINCT app_id FROM chart_snapshots
        WHERE market = ? AND store = ? AND category = '${CATEGORY}'
          AND captured_at BETWEEN ? AND ?
@@ -444,10 +432,7 @@ function computePublisherTenureLOO(
 
   // Aggregate by publisher (publisher_id, store): list of (app, market, days).
   // Then for each (app, store) compute LOO mean of OTHER (app, market) tenures.
-  const publisherIndex = new Map<
-    string,
-    { app_id: string; market: string; days: number }[]
-  >(); // 'publisher_id|store' → list
+  const publisherIndex = new Map<string, { app_id: string; market: string; days: number }[]>(); // 'publisher_id|store' → list
 
   for (const [appStore, marketTenures] of perAppStoreTenure) {
     const [app_id, store] = appStore.split("|") as [string, Store];
@@ -595,10 +580,7 @@ function main(): void {
 
   // Coverage report: per signal, count rows + non-null
   const coverage = db
-    .prepare<
-      { signal_name: string; total: number; non_null: number },
-      []
-    >(
+    .prepare<{ signal_name: string; total: number; non_null: number }, []>(
       `SELECT signal_name, COUNT(*) AS total, SUM(CASE WHEN value IS NOT NULL THEN 1 ELSE 0 END) AS non_null
        FROM signal_snapshots
        WHERE signal_name LIKE 'pathc.%'

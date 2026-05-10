@@ -95,7 +95,13 @@ function extractInvariants(line: string, lineNo: number): InvariantRow | null {
 
   // 422 ValidationError records have raw.metadata.error — skip; no invariants.
   if (!md || typeof md !== "object" || "error" in md) {
-    return { app_id, store: storeRaw, publisher_id: null, publisher_name: null, release_date_ms: null };
+    return {
+      app_id,
+      store: storeRaw,
+      publisher_id: null,
+      publisher_name: null,
+      release_date_ms: null,
+    };
   }
 
   let publisher_id: string | null = null;

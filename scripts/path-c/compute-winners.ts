@@ -166,10 +166,7 @@ function main(): void {
     // Batch queries: one for exact-day, one for window.
     // Exact: app_id IN (cohort apps) AND captured_at = t_measure AND rank <= 100
     const exactRows = db
-      .prepare<
-        { app_id: string },
-        [string, Store, number, ...string[]]
-      >(
+      .prepare<{ app_id: string }, [string, Store, number, ...string[]]>(
         `SELECT DISTINCT app_id FROM chart_snapshots
          WHERE market = ? AND store = ? AND category = '${CATEGORY}'
            AND captured_at = ?
@@ -181,10 +178,7 @@ function main(): void {
 
     // Window: app_id IN (cohort apps) AND captured_at IN [windowStart, t_measure] AND rank <= 100
     const windowRows = db
-      .prepare<
-        { app_id: string },
-        [string, Store, number, number, ...string[]]
-      >(
+      .prepare<{ app_id: string }, [string, Store, number, number, ...string[]]>(
         `SELECT DISTINCT app_id FROM chart_snapshots
          WHERE market = ? AND store = ? AND category = '${CATEGORY}'
            AND captured_at BETWEEN ? AND ?
@@ -226,10 +220,8 @@ function main(): void {
       totalWritten,
       totalWinnersExact,
       totalWinnersWindow,
-      exactPct:
-        totalWritten > 0 ? ((100 * totalWinnersExact) / totalWritten).toFixed(1) : "?",
-      windowPct:
-        totalWritten > 0 ? ((100 * totalWinnersWindow) / totalWritten).toFixed(1) : "?",
+      exactPct: totalWritten > 0 ? ((100 * totalWinnersExact) / totalWritten).toFixed(1) : "?",
+      windowPct: totalWritten > 0 ? ((100 * totalWinnersWindow) / totalWritten).toFixed(1) : "?",
       durationMs,
     },
     "compute-winners complete",
