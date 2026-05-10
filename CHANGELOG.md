@@ -5,6 +5,72 @@ All notable changes to `@apps-machine/selection-agent` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0] — 2026-05-08
+
+The discovery methodology shipped as four CLI commands + a library API.
+The package's primitive shifts from "live scan + judges" (v0.6-0.10) to
+**"list the takeable" 5-stage discovery pipeline** (v0.11). The methodology
+itself comes from empirical work: two consecutive predictive-ranker
+investigations (locGap thesis + additive linear factor stack) returned DEAD
+verdicts on tier-2 SEA mobile-app data, and the operator-correct reframe is
+"filter durable winners + classify clonability" rather than "predict future
+winners from public signal."
+
+### Added
+
+- **`selection-agent audit` CLI command** (Stage 1 pre-flight data audit) —
+  runs 6 SQL checks against a local sqlite cache, surfaces coverage /
+  point-in-time / precompute / app_invariants issues before discovery
+  cycles. Exit 0 if all PASS or WARN, exit 1 if any FAIL. Per-check
+  PASS/WARN/FAIL with markdown report output.
+- **`selection-agent shortlist` CLI command** (Stage 2 shortlist pipeline)
+  — 5-filter shortlist generator (durability, cross-market, DNA-clonable
+  category, indie-vs-mega via LLM) producing a ranked CSV/JSON of
+  clonable indie portfolio candidates. LLM clonability classifier
+  optional via `--no-llm` flag; otherwise requires `ANTHROPIC_API_KEY`.
+  Reference funnel sanity ranges documented inline so deviations are
+  surfaced loud.
+- **`selection-agent risk-check` CLI command** (Stage 3 risk-threshold
+  evaluation) — annotates a shortlist with PASS/WARN/FAIL/INFO per check
+  against a user-supplied Zod-validated thresholds JSON. 5 checks:
+  `markets_spread`, `tenure`, `subscription_iap`, `supported_markets`,
+  `clonable_dna`. Aggregate verdict per candidate, summary across
+  shortlist. JSON or CSV output.
+- **`selection-agent dossier` CLI command** (Stage 5 dossier generator) —
+  generates a populated markdown dossier from shortlist + candidate ref.
+  Default template includes 12 sections (front matter, candidate
+  auto-populated from shortlist, opportunity placeholder, 9 strategic
+  filters, archetype, ASO keywords, AI hook, risk thresholds, kill
+  criteria, out-of-scope, operator signoff). Custom templates via
+  `--template <path>` with mustache-style `{{...}}` token substitution.
+- **Library API entry point** at `src/index.ts` — re-exports schemas,
+  evaluators, and template constants for npm consumers building their
+  own discovery tooling. Public exports: `RiskThresholdsSchema`,
+  `RiskThresholds`, `DEFAULT_SUPPORTED_MARKETS`,
+  `DEFAULT_CLONABLE_DNA_CLASSES`, `evaluateCandidate`,
+  `evaluateShortlist`, `buildDossier`, `parseCandidateRef`,
+  `findCandidate`, `DEFAULT_DOSSIER_TEMPLATE`, plus types.
+- **`docs/discovery-methodology.md`** — productized methodology guide for
+  npm consumers (5-stage pipeline, 7 anti-patterns, kill-criteria
+  framework, lessons-learned, citations).
+- **README rewrite** for the v0.11 audience — npm-front-page for solo
+  indie operators discovering the package via `npm view` or the GitHub
+  mirror.
+
+### Changed
+
+- `package.json` `files:` array now includes `docs/` so the methodology
+  guide ships in the published tarball, and `CHANGELOG.md` so version
+  history is visible to npm consumers without leaving the package.
+
+### Engineering
+
+- 880 tests pass (was 750 in v0.10.0). Added ~130 tests across 4 CLI
+  command suites + library API surface.
+- Typecheck clean.
+- Open-core boundary preserved: no operator-specific or
+  organization-internal references in any published file.
+
 ## [0.10.0] - 2026-05-07
 
 Path B' verdict shipped: locGap LLM judge + 70-cohort backtest infrastructure

@@ -94,7 +94,7 @@ export function importApptweakCharts(
     (() => {
       if (!existsSync(file_path)) {
         throw new Error(
-          `apptweak-import: file not found: ${file_path}. Re-pull via packages/selection-agent/scripts/apptweak/pull-charts.ts`,
+          `apptweak-import: file not found: ${file_path}. Provide a chart-snapshots TSV (gz or raw) from your AppTweak chart-rank export.`,
         );
       }
       const buf = readFileSync(file_path);

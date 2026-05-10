@@ -295,6 +295,76 @@ CREATE TABLE IF NOT EXISTS cohort_freezes (
 ` as const;
 
 /**
+ * path_c_winners — per (app, market, store, t0) winner labels for Path C v3.
+ *
+ * Path C's H1 horizon design uses per-cohort 90d-forward windows, with
+ * winner labels scoped to (market, store) — same app can be a winner in
+ * one market and a loser in another at the same t0. The legacy
+ * `winner_scores` table has PK (app_id, t0) which collapses across
+ * markets/stores, so a new table is required.
+ *
+ * Two boolean columns per row (kept INTEGER for SQLite-canonical 0/1):
+ *   - winner_exact: rank ≤ 100 at exactly captured_at = t_measure (= t0 + 90d)
+ *   - winner_window_7d: rank ≤ 100 anywhere in [t_measure - 6d, t_measure]
+ *
+ * Both labels are reported in the verdict; primary is `winner_exact`.
+ *
+ * t_measure is stored explicitly so verdict generation doesn't need to
+ * recompute it from t0 + 90d (avoids day-boundary off-by-one risk).
+ */
+export const PATH_C_WINNERS_SCHEMA = `
+CREATE TABLE IF NOT EXISTS path_c_winners (
+  app_id           TEXT NOT NULL,
+  market           TEXT NOT NULL,
+  store            TEXT NOT NULL CHECK(store IN ('apple','googleplay')),
+  t0               INTEGER NOT NULL,
+  t_measure        INTEGER NOT NULL,
+  winner_exact     INTEGER NOT NULL CHECK(winner_exact IN (0,1)),
+  winner_window_7d INTEGER NOT NULL CHECK(winner_window_7d IN (0,1)),
+  computed_at      INTEGER NOT NULL,
+  PRIMARY KEY (app_id, market, store, t0)
+);
+CREATE INDEX IF NOT EXISTS idx_path_c_winners_cohort
+  ON path_c_winners(market, store, t0);
+` as const;
+
+/**
+ * app_invariants — point-in-time-safe invariant fields per (app_id, store).
+ *
+ * Path C v3 design (`docs/planning/agent-v1-path-c-design.md`) requires two
+ * fields from `metadata.jsonl` that are stable regardless of the t0 label
+ * the AppTweak pull was attached to: `release_date` (original launch date)
+ * and `publisher_id` (Apple `developer.id` or Google `developer` string).
+ *
+ * Why a dedicated table: the existing `app_metadata_snapshots` table
+ * persists raw parsed_json blobs per (app_id, market, captured_at, source).
+ * For Path C we need a flat, indexed projection of just the invariant
+ * fields, joined cheaply against `chart_snapshots` for F7/F11. Storing
+ * publisher_id as a typed column allows F7's self-join on publisher_id
+ * without json_extract.
+ *
+ * PRIMARY KEY (app_id, store): an app's release_date and developer are
+ * store-specific (same app on Apple and Google may have different
+ * publisher records). market is intentionally NOT in the PK because the
+ * invariant fields don't vary by market — the same Apple app has the
+ * same release_date and developer.id in id/vn/th/etc.
+ */
+export const APP_INVARIANTS_SCHEMA = `
+CREATE TABLE IF NOT EXISTS app_invariants (
+  app_id         TEXT NOT NULL,
+  store          TEXT NOT NULL CHECK(store IN ('apple','googleplay')),
+  publisher_id   TEXT,
+  publisher_name TEXT,
+  release_date   INTEGER,
+  source         TEXT NOT NULL,
+  ingested_at    INTEGER NOT NULL,
+  PRIMARY KEY (app_id, store)
+);
+CREATE INDEX IF NOT EXISTS idx_app_invariants_publisher
+  ON app_invariants(publisher_id, store);
+` as const;
+
+/**
  * Ordered list of v1 migrations. Versions are stable identifiers — never
  * rename. To evolve a table, add a new migration with a new version; do
  * NOT edit an existing migration's DDL string.
@@ -349,6 +419,14 @@ export const V1_MIGRATIONS: readonly { readonly version: string; readonly ddl: s
   {
     version: "v1-2026-05-05-app-metadata-snapshots-add-apptweak",
     ddl: APP_METADATA_SNAPSHOTS_ADD_APPTWEAK_SCHEMA,
+  },
+  {
+    version: "v1-2026-05-07-app-invariants",
+    ddl: APP_INVARIANTS_SCHEMA,
+  },
+  {
+    version: "v1-2026-05-07-path-c-winners",
+    ddl: PATH_C_WINNERS_SCHEMA,
   },
 ] as const;
 

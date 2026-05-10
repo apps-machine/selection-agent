@@ -3,9 +3,18 @@ import { defineCommand, runMain } from "citty";
 import { runDemo } from "../demo/run-demo.ts";
 import type { JudgeClient } from "../judges/text-judge.ts";
 import type { ImageFetcher, VisionJudgeClient } from "../judges/vision-judge.ts";
+import { buildShortlist, defaultAnthropicLlmClient } from "../path-e/build-shortlist.ts";
 import { runSnapshot } from "../velocity/run-snapshot.ts";
+import { runAudit } from "./audit.ts";
 import { renderBanner, VERSION } from "./banner.ts";
+import {
+  DossierInputError,
+  DossierNotFoundError,
+  DossierWriteError,
+  runDossier,
+} from "./dossier.ts";
 import { formatError } from "./errors.ts";
+import { RiskCheckInputError, runRiskCheck } from "./risk-check.ts";
 
 function parseList(v: unknown): string[] | undefined {
   if (typeof v !== "string" || v.length === 0) return undefined;
@@ -13,6 +22,25 @@ function parseList(v: unknown): string[] | undefined {
     .split(",")
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
+}
+
+/**
+ * Parse a comma-separated list of ISO alpha-2 market codes.
+ *
+ * Validates each token against /^[a-z]{2}$/. Throws on invalid tokens so the
+ * caller surface (e.g. the audit subcommand) can format a clean error and
+ * exit 2. Returns undefined when the flag is unset/empty so the caller can
+ * fall back to its default cluster.
+ */
+function parseMarkets(v: unknown): string[] | undefined {
+  const parsed = parseList(v);
+  if (!parsed) return undefined;
+  for (const token of parsed) {
+    if (!/^[a-z]{2}$/.test(token)) {
+      throw new Error(`invalid market code: ${token} (expected ISO alpha-2 lowercase)`);
+    }
+  }
+  return parsed;
 }
 
 function parseStores(v: unknown): ("apple" | "google")[] | undefined {
@@ -73,6 +101,492 @@ const main = defineCommand({
       "Apps Machine Selection Agent — ranks app opportunities globally via dual-store scraping + Claude judges.",
   },
   subCommands: {
+    audit: defineCommand({
+      meta: {
+        name: "audit",
+        description:
+          "Stage 1 pre-flight data audit (Runbook-Discovery). Runs 6 checks against the cache DB and emits a Markdown report. Exits 1 on FAIL.",
+      },
+      args: {
+        db: {
+          type: "string",
+          description:
+            "SQLite DB path (overrides $SELECTION_AGENT_DB; default ./.cache/selection-agent.sqlite)",
+        },
+        markets: {
+          type: "string",
+          description:
+            "Comma-separated ISO alpha-2 market codes for chart-coverage checks (default: bd,th,vn,my,id — tier-2 SEA cluster)",
+        },
+        metadata: {
+          type: "string",
+          description:
+            "Path to the metadata.jsonl[.gz] dossier file. If omitted, scans data/apptweak-*/metadata.jsonl{,.gz} (latest dated dir wins).",
+        },
+        output: {
+          type: "string",
+          description:
+            "Write the markdown report to this path. If omitted, the report goes to stdout.",
+        },
+      },
+      async run({ args }) {
+        const dbPath =
+          (typeof args.db === "string" && args.db) ||
+          process.env.SELECTION_AGENT_DB ||
+          "./.cache/selection-agent.sqlite";
+        let markets: string[] | undefined;
+        try {
+          markets = parseMarkets(args.markets);
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          console.error(
+            formatError({
+              code: "INVALID_MARKETS",
+              message,
+              cause: "--markets must be a comma-separated list of ISO alpha-2 codes.",
+              fix: "rerun with --markets bd,th,vn,my,id (default) or another cluster",
+              docs: "docs/discovery-methodology.md § Stage 1",
+            }),
+          );
+          process.exit(2);
+        }
+        const output = typeof args.output === "string" && args.output ? args.output : undefined;
+        const metadataPath =
+          typeof args.metadata === "string" && args.metadata ? args.metadata : undefined;
+        try {
+          const result = await runAudit({ dbPath, markets, output, metadataPath });
+          if (!output) {
+            process.stdout.write(result.report);
+          } else {
+            process.stdout.write(`Audit report written to ${output}\n`);
+          }
+          process.exit(result.exitCode);
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          console.error(
+            formatError({
+              code: "AUDIT_FAILED",
+              message,
+              cause: "Audit threw before producing a report.",
+              fix: "Check that the DB path is readable and that the schema matches the package version.",
+              docs: "docs/discovery-methodology.md § Stage 1",
+            }),
+          );
+          process.exit(1);
+        }
+      },
+    }),
+    shortlist: defineCommand({
+      meta: {
+        name: "shortlist",
+        description:
+          "Stage 2 Path E shortlist generator (Runbook-Discovery). Runs 5 sequential filters (durability, indie, mechanic, monetization, market spread) + optional LLM clonability classifier → ranked CSV/JSON shortlist of 30-50 candidate apps to clone.",
+      },
+      args: {
+        db: {
+          type: "string",
+          description:
+            "SQLite DB path (overrides $SELECTION_AGENT_DB; default ./.cache/selection-agent.sqlite)",
+        },
+        markets: {
+          type: "string",
+          description:
+            "Comma-separated ISO alpha-2 market codes (default: id,vn,th,my,bd — tier-2 SEA cluster)",
+        },
+        metadata: {
+          type: "string",
+          description:
+            "Path to the metadata.jsonl[.gz] dossier file. If omitted, scans data/apptweak-*/metadata.jsonl{,.gz} (latest dated dir wins).",
+        },
+        output: {
+          type: "string",
+          description:
+            "Directory for output artifacts. A timestamped subdirectory is created with shortlist.csv + shortlist.json. If omitted, no files are written.",
+        },
+        llm: {
+          type: "boolean",
+          description:
+            "Run the LLM clonability classifier (default: true). Pass --no-llm to skip judges and keep all dna-clonable candidates.",
+          default: true,
+        },
+        "shortlist-size": {
+          type: "string",
+          description: "Final shortlist size (default: 50)",
+        },
+      },
+      async run({ args }) {
+        const dbPath =
+          (typeof args.db === "string" && args.db) ||
+          process.env.SELECTION_AGENT_DB ||
+          "./.cache/selection-agent.sqlite";
+        let markets: string[] | undefined;
+        try {
+          markets = parseMarkets(args.markets);
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          console.error(
+            formatError({
+              code: "INVALID_MARKETS",
+              message,
+              cause: "--markets must be a comma-separated list of ISO alpha-2 codes.",
+              fix: "rerun with --markets id,vn,th,my,bd (default) or another cluster",
+              docs: "docs/discovery-methodology.md § Stage 2",
+            }),
+          );
+          process.exit(2);
+        }
+        const metadataPath =
+          typeof args.metadata === "string" && args.metadata ? args.metadata : undefined;
+        const outputDir = typeof args.output === "string" && args.output ? args.output : undefined;
+        const noLlm = args.llm === false;
+        const rawSize =
+          typeof args["shortlist-size"] === "string" ? args["shortlist-size"] : undefined;
+        let finalShortlistSize: number | undefined;
+        if (rawSize !== undefined) {
+          finalShortlistSize = Number.parseInt(rawSize, 10);
+          if (!Number.isFinite(finalShortlistSize) || finalShortlistSize <= 0) {
+            console.error(
+              formatError({
+                code: "INVALID_SHORTLIST_SIZE",
+                message: `--shortlist-size must be a positive integer, got "${rawSize}"`,
+                cause: "The final shortlist is truncated to this many rows.",
+                fix: "rerun with --shortlist-size 50 (default) or another positive integer",
+                docs: "docs/discovery-methodology.md § Stage 2",
+              }),
+            );
+            process.exit(2);
+          }
+        }
+        if (!noLlm && !process.env.ANTHROPIC_API_KEY) {
+          console.error(
+            formatError({
+              code: "MISSING_API_KEY",
+              message: "ANTHROPIC_API_KEY is required for the clonability classifier",
+              cause: "The LLM step rates each candidate's solo-clonability.",
+              fix: [
+                "1. Get a key: https://console.anthropic.com/settings/keys",
+                "2. Export it in your shell:",
+                "     export ANTHROPIC_API_KEY=sk-ant-api03-...",
+                "3. Re-run shortlist:",
+                "     npx @apps-machine/selection-agent shortlist",
+                "",
+                "Or skip the LLM step entirely:",
+                "     npx @apps-machine/selection-agent shortlist --no-llm",
+              ],
+              docs: "docs/discovery-methodology.md § Stage 2",
+            }),
+          );
+          process.exit(2);
+        }
+        try {
+          const llmClient = noLlm ? undefined : await defaultAnthropicLlmClient({});
+          const result = await buildShortlist({
+            dbPath,
+            markets,
+            metadataPath,
+            outputDir,
+            skipLLM: noLlm,
+            llmClient,
+            finalShortlistSize,
+          });
+          process.stdout.write(
+            `Shortlist: ${result.shortlist.length} apps (from ${result.funnel.final_candidates} candidates).\n`,
+          );
+          process.stdout.write(
+            `Funnel: F1=${result.funnel.f1_post_durability} → rollup=${result.funnel.f1_post_rollup_app_store_pairs} → F5=${result.funnel.f5_post_market_spread} → meta-matched=${result.funnel.f1_post_rollup_app_store_pairs - result.funnel.dropped_no_meta - result.funnel.dropped_no_pub} → clonable=${result.funnel.final_candidates}\n`,
+          );
+          if (!noLlm) {
+            process.stdout.write(
+              `LLM: ${result.funnel.llm_kept} CLONE, ${result.funnel.llm_dropped} SKIP, ${result.funnel.llm_unparsed} unparsed.\n`,
+            );
+          }
+          if (result.csvPath) {
+            process.stdout.write(`Wrote ${result.csvPath}\n`);
+            process.stdout.write(`Wrote ${result.jsonPath}\n`);
+          }
+          process.exit(0);
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          console.error(
+            formatError({
+              code: "SHORTLIST_FAILED",
+              message,
+              cause: "buildShortlist threw before producing a shortlist.",
+              fix: "Check the DB path, the metadata.jsonl path, and (if not --no-llm) your ANTHROPIC_API_KEY.",
+              docs: "docs/discovery-methodology.md § Stage 2",
+            }),
+          );
+          process.exit(1);
+        }
+      },
+    }),
+    "risk-check": defineCommand({
+      meta: {
+        name: "risk-check",
+        description:
+          "Stage 3 risk-threshold annotator (Runbook-Discovery). Reads a shortlist JSON + a thresholds JSON, evaluates 5 checks (markets_spread, tenure, subscription_iap, supported_markets, clonable_dna) per candidate, and emits annotated JSON or CSV. Exits 0 if any candidate PASSes, 1 if none, 2 on bad input.",
+      },
+      args: {
+        shortlist: {
+          type: "string",
+          description: "Path to the shortlist JSON (output of `selection-agent shortlist`).",
+          required: true,
+        },
+        thresholds: {
+          type: "string",
+          description:
+            "Path to the thresholds JSON file. Partial JSON is fine — defaults fill in missing fields.",
+          required: true,
+        },
+        output: {
+          type: "string",
+          description:
+            "Write the annotated payload to this path. If omitted, output goes to stdout.",
+        },
+        format: {
+          type: "string",
+          description: "Output format: json | csv (default: json).",
+          default: "json",
+        },
+      },
+      run({ args }) {
+        const shortlistPath = typeof args.shortlist === "string" ? args.shortlist : "";
+        const thresholdsPath = typeof args.thresholds === "string" ? args.thresholds : "";
+        const output = typeof args.output === "string" && args.output ? args.output : undefined;
+        const formatRaw = typeof args.format === "string" ? args.format : "json";
+        if (formatRaw !== "json" && formatRaw !== "csv") {
+          console.error(
+            formatError({
+              code: "INVALID_FORMAT",
+              message: `unknown --format value "${formatRaw}"`,
+              cause: "--format accepts 'json' or 'csv'",
+              fix: "rerun with --format json (default) or --format csv",
+              docs: "docs/discovery-methodology.md § Stage 3",
+            }),
+          );
+          process.exit(2);
+        }
+        if (!shortlistPath) {
+          console.error(
+            formatError({
+              code: "MISSING_SHORTLIST",
+              message: "--shortlist is required",
+              cause: "risk-check needs a shortlist JSON to annotate.",
+              fix: "rerun with --shortlist <path-to-shortlist.json>",
+              docs: "docs/discovery-methodology.md § Stage 3",
+            }),
+          );
+          process.exit(2);
+        }
+        if (!thresholdsPath) {
+          console.error(
+            formatError({
+              code: "MISSING_THRESHOLDS",
+              message: "--thresholds is required",
+              cause: "risk-check needs a thresholds JSON to evaluate against.",
+              fix: "rerun with --thresholds <path-to-thresholds.json>",
+              docs: "docs/discovery-methodology.md § Stage 3",
+            }),
+          );
+          process.exit(2);
+        }
+        try {
+          const result = runRiskCheck({
+            shortlistPath,
+            thresholdsPath,
+            output,
+            format: formatRaw,
+          });
+          if (!output) {
+            process.stdout.write(result.body);
+          } else {
+            process.stdout.write(
+              `risk-check: ${result.annotated.summary.pass} PASS, ${result.annotated.summary.warn} WARN, ${result.annotated.summary.fail} FAIL (of ${result.annotated.summary.total}). Wrote ${output}\n`,
+            );
+          }
+          process.exit(result.exitCode);
+        } catch (err) {
+          if (err instanceof RiskCheckInputError) {
+            console.error(
+              formatError({
+                code: err.code,
+                message: err.message,
+                cause: "risk-check input validation failed before evaluation.",
+                fix: "Fix the offending file (or pass `{}` for thresholds to use defaults), then rerun.",
+                docs: "docs/discovery-methodology.md § Stage 3",
+              }),
+            );
+            process.exit(2);
+          }
+          const message = err instanceof Error ? err.message : String(err);
+          console.error(
+            formatError({
+              code: "RISK_CHECK_FAILED",
+              message,
+              cause: "runRiskCheck threw before producing a result.",
+              fix: "Check that --shortlist and --thresholds point at readable files containing valid JSON.",
+              docs: "docs/discovery-methodology.md § Stage 3",
+            }),
+          );
+          process.exit(1);
+        }
+      },
+    }),
+    dossier: defineCommand({
+      meta: {
+        name: "dossier",
+        description:
+          "Stage 5 discovery dossier generator (Runbook-Discovery). Reads a shortlist JSON + a candidate ref (<app_id>:<store>) and writes a populated dossier markdown file ready for the operator to fill subjective sections + sign GO/NO-GO. Supported template tokens: {{slug}}, {{date}}, {{shortlist_source}}, {{candidate.app_id}}, {{candidate.store}}, {{candidate.title}}, {{candidate.publisher_name}}, {{candidate.publisher_app_count}}, {{candidate.dna_class}}, {{candidate.dna_subclass}}, {{candidate.markets_active}}, {{candidate.tenure_days_max}}, {{candidate.best_rank}}, {{candidate.has_subscription_iap}}, {{candidate.iap_count}}, {{candidate.score}}, {{candidate.clonability_hypothesis}}.",
+      },
+      args: {
+        shortlist: {
+          type: "string",
+          description: "Path to the shortlist JSON (output of `selection-agent shortlist`).",
+          required: true,
+        },
+        candidate: {
+          type: "string",
+          description:
+            "Candidate reference in the form `<app_id>:<store>` (e.g. 544007664:apple, com.example.app:googleplay).",
+          required: true,
+        },
+        slug: {
+          type: "string",
+          description: "Short brand slug used in the dossier title and the default filename.",
+          required: true,
+        },
+        template: {
+          type: "string",
+          description:
+            "Optional path to a user-supplied dossier template (markdown with {{token}} placeholders).",
+        },
+        output: {
+          type: "string",
+          description:
+            "Output path for the dossier. Defaults to `<slug>-dossier-<YYYY-MM-DD>.md` in the current directory.",
+        },
+      },
+      run({ args }) {
+        const shortlistPath = typeof args.shortlist === "string" ? args.shortlist : "";
+        const candidateRef = typeof args.candidate === "string" ? args.candidate : "";
+        const slug = typeof args.slug === "string" ? args.slug : "";
+        const templatePath =
+          typeof args.template === "string" && args.template ? args.template : undefined;
+        const output = typeof args.output === "string" && args.output ? args.output : undefined;
+
+        if (!shortlistPath) {
+          console.error(
+            formatError({
+              code: "MISSING_SHORTLIST",
+              message: "--shortlist is required",
+              cause: "dossier needs a shortlist JSON to populate the candidate section.",
+              fix: "rerun with --shortlist <path-to-shortlist.json>",
+              docs: "docs/discovery-methodology.md § Stage 5",
+            }),
+          );
+          process.exit(2);
+        }
+        if (!candidateRef) {
+          console.error(
+            formatError({
+              code: "MISSING_CANDIDATE",
+              message: "--candidate is required",
+              cause: "dossier needs a candidate ref `<app_id>:<store>` to look up.",
+              fix: "rerun with --candidate <app_id>:<store> (e.g. 544007664:apple)",
+              docs: "docs/discovery-methodology.md § Stage 5",
+            }),
+          );
+          process.exit(2);
+        }
+        if (!slug) {
+          console.error(
+            formatError({
+              code: "MISSING_SLUG",
+              message: "--slug is required",
+              cause: "dossier needs a slug for the title heading + default filename.",
+              fix: "rerun with --slug <name> (e.g. tidyphone)",
+              docs: "docs/discovery-methodology.md § Stage 5",
+            }),
+          );
+          process.exit(2);
+        }
+
+        try {
+          const result = runDossier({
+            shortlistPath,
+            candidateRef,
+            slug,
+            templatePath,
+            output,
+          });
+          if (result.dossierPath) {
+            process.stdout.write(`Wrote ${result.dossierPath}\n`);
+          }
+          process.exit(result.exitCode);
+        } catch (err) {
+          if (err instanceof DossierInputError) {
+            console.error(
+              formatError({
+                code: err.code,
+                message: err.message,
+                cause: "dossier input validation failed before generation.",
+                fix: "Fix the offending file path or JSON, then rerun.",
+                docs: "docs/discovery-methodology.md § Stage 5",
+              }),
+            );
+            process.exit(2);
+          }
+          if (err instanceof DossierNotFoundError) {
+            console.error(
+              formatError({
+                code: err.code,
+                message: err.message,
+                cause: "The candidate ref did not match any row in the shortlist.",
+                fix: "Inspect the shortlist JSON and pick an existing `<app_id>:<store>` pair.",
+                docs: "docs/discovery-methodology.md § Stage 5",
+              }),
+            );
+            process.exit(1);
+          }
+          if (err instanceof DossierWriteError) {
+            console.error(
+              formatError({
+                code: err.code,
+                message: err.message,
+                cause: "Output path could not be written.",
+                fix: "Check that the parent directory exists and is writable, then rerun.",
+                docs: "docs/discovery-methodology.md § Stage 5",
+              }),
+            );
+            process.exit(1);
+          }
+          // Unrecognized: ref-parse failure (Error from parseCandidateRef) or unexpected.
+          const message = err instanceof Error ? err.message : String(err);
+          if (/candidate ref/.test(message)) {
+            console.error(
+              formatError({
+                code: "INVALID_CANDIDATE",
+                message,
+                cause: "--candidate must be `<app_id>:<store>` with store ∈ apple|googleplay.",
+                fix: "rerun with --candidate <app_id>:<store> (e.g. 544007664:apple)",
+                docs: "docs/discovery-methodology.md § Stage 5",
+              }),
+            );
+            process.exit(2);
+          }
+          console.error(
+            formatError({
+              code: "DOSSIER_FAILED",
+              message,
+              cause: "runDossier threw before writing the dossier.",
+              fix: "Check that --shortlist points at a valid shortlist JSON and --slug is non-empty.",
+              docs: "docs/discovery-methodology.md § Stage 5",
+            }),
+          );
+          process.exit(1);
+        }
+      },
+    }),
     demo: defineCommand({
       meta: {
         name: "demo",
