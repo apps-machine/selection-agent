@@ -32,6 +32,7 @@ interface CoverageRow {
   store: string;
   min_dt: number | null;
   max_dt: number | null;
+  distinct_days: number;
   rows: number;
 }
 
@@ -39,20 +40,29 @@ interface CoverageRow {
  * Check #1 — chart_snapshots coverage per (market, store).
  *
  * Rules:
- *   PASS: every (market) has ≥300 days coverage (across union of stores)
- *   WARN: any market 200-299 days
- *   FAIL: any market <200 days
+ *   PASS: every market has ≥300 distinct days of data (across union of stores)
+ *   WARN: any market 200-299 distinct days
+ *   FAIL: any market <200 distinct days
  *
  * Coverage is measured per-market across stores so a market that is
- * googleplay-only (e.g. bd) is not penalised for lacking apple rows.
+ * googleplay-only (e.g. bd) is not penalised for lacking apple rows. We count
+ * DISTINCT calendar days (UTC) rather than wall-clock span so a dataset with
+ * rows only at the endpoints (e.g. day 0 and day 350 with 348 missing days)
+ * does NOT spuriously pass the 300d threshold — the runbook intent is "300+
+ * days of actual data", not "data exists at endpoints 300+ days apart".
  */
 export function checkChartCoverage(db: Database, markets: readonly string[]): CheckResult {
   const placeholders = markets.map(() => "?").join(",");
+  // Per (market, store, day) we compute the distinct days, then roll up across
+  // stores per market by unioning the day sets. To avoid pulling every row
+  // into JS, we do a two-step query: first the per-(market,store) min/max/rows,
+  // then a separate query for distinct (market, day) pairs that we union in JS.
   const rows = db
     .prepare<CoverageRow, string[]>(
       `SELECT market, store,
               MIN(captured_at) AS min_dt,
               MAX(captured_at) AS max_dt,
+              COUNT(DISTINCT date(captured_at/1000, 'unixepoch')) AS distinct_days,
               COUNT(*) AS rows
        FROM chart_snapshots
        WHERE market IN (${placeholders})
@@ -69,7 +79,23 @@ export function checkChartCoverage(db: Database, markets: readonly string[]): Ch
     };
   }
 
-  // Roll up per market across stores.
+  // Roll up per market across stores. For distinct-day count we need the
+  // union of (market, day) tuples, not the sum (apple+google often capture
+  // the same day). Pull the distinct day set per market.
+  const dayRows = db
+    .prepare<{ market: string; day: string }, string[]>(
+      `SELECT DISTINCT market, date(captured_at/1000, 'unixepoch') AS day
+       FROM chart_snapshots
+       WHERE market IN (${placeholders})`,
+    )
+    .all(...markets);
+  const distinctDaysByMarket = new Map<string, Set<string>>();
+  for (const dr of dayRows) {
+    const cur = distinctDaysByMarket.get(dr.market) ?? new Set<string>();
+    cur.add(dr.day);
+    distinctDaysByMarket.set(dr.market, cur);
+  }
+
   const perMarket = new Map<string, { minDt: number; maxDt: number; rows: number }>();
   for (const r of rows) {
     if (r.min_dt == null || r.max_dt == null) continue;
@@ -92,21 +118,21 @@ export function checkChartCoverage(db: Database, markets: readonly string[]): Ch
       worstStatus = "FAIL";
       continue;
     }
-    const days = Math.floor((v.maxDt - v.minDt) / DAY_MS);
+    const distinctDays = distinctDaysByMarket.get(m)?.size ?? 0;
     let status: CheckStatus;
-    if (days < 200) status = "FAIL";
-    else if (days < 300) status = "WARN";
+    if (distinctDays < 200) status = "FAIL";
+    else if (distinctDays < 300) status = "WARN";
     else status = "PASS";
     if (rankStatus(status) > rankStatus(worstStatus)) worstStatus = status;
     lines.push(
-      `  ${m}: ${days}d coverage (${v.rows} rows, ${formatDate(v.minDt)} → ${formatDate(v.maxDt)}) [${status}]`,
+      `  ${m}: ${distinctDays}d coverage (distinct days, ${v.rows} rows, ${formatDate(v.minDt)} → ${formatDate(v.maxDt)}) [${status}]`,
     );
   }
 
   return {
     name: "chart_snapshots coverage",
     status: worstStatus,
-    details: `coverage per market (target ≥300d):\n${lines.join("\n")}`,
+    details: `coverage per market (target ≥300 distinct days):\n${lines.join("\n")}`,
   };
 }
 
@@ -268,10 +294,7 @@ export function checkSignalSnapshotsInventory(db: Database): CheckResult {
  */
 export function checkAppInvariantsCoverage(db: Database): CheckResult {
   const row = db
-    .prepare<
-      { total: number; with_publisher: number; with_release: number },
-      []
-    >(
+    .prepare<{ total: number; with_publisher: number; with_release: number }, []>(
       `SELECT COUNT(*) AS total,
               SUM(CASE WHEN publisher_id IS NOT NULL THEN 1 ELSE 0 END) AS with_publisher,
               SUM(CASE WHEN release_date IS NOT NULL THEN 1 ELSE 0 END) AS with_release

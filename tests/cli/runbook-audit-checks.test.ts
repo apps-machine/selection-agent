@@ -99,6 +99,52 @@ describe("checkChartCoverage", () => {
     expect(r.status).toBe("FAIL");
     expect(r.details).toContain("vn: MISSING");
   });
+
+  // Boundary tests on distinct-day count. The check counts DISTINCT calendar
+  // days, NOT wall-clock span between MIN/MAX. Intent: a dataset with rows at
+  // only the endpoints should not pass the 300d threshold.
+  test("PASS at exactly 300 distinct days (boundary)", () => {
+    for (let i = 0; i < 300; i++) {
+      insertChartRow(db, "id", "apple", NOW - i * DAY_MS, 1, `app_${i}`);
+    }
+    const r = checkChartCoverage(db, ["id"]);
+    expect(r.status).toBe("PASS");
+    expect(r.details).toContain("300d coverage (distinct days");
+  });
+
+  test("WARN at 299 distinct days (boundary)", () => {
+    for (let i = 0; i < 299; i++) {
+      insertChartRow(db, "id", "apple", NOW - i * DAY_MS, 1, `app_${i}`);
+    }
+    const r = checkChartCoverage(db, ["id"]);
+    expect(r.status).toBe("WARN");
+  });
+
+  test("WARN at exactly 200 distinct days (boundary)", () => {
+    for (let i = 0; i < 200; i++) {
+      insertChartRow(db, "id", "apple", NOW - i * DAY_MS, 1, `app_${i}`);
+    }
+    const r = checkChartCoverage(db, ["id"]);
+    expect(r.status).toBe("WARN");
+  });
+
+  test("FAIL at 199 distinct days (boundary)", () => {
+    for (let i = 0; i < 199; i++) {
+      insertChartRow(db, "id", "apple", NOW - i * DAY_MS, 1, `app_${i}`);
+    }
+    const r = checkChartCoverage(db, ["id"]);
+    expect(r.status).toBe("FAIL");
+  });
+
+  test("FAIL when only endpoint days exist (span-of-extremes is large but distinct days is small)", () => {
+    // 2 rows: one at NOW, one at NOW - 350d. Span-of-extremes math would say
+    // 350d coverage, but distinct-day count is 2 → FAIL.
+    insertChartRow(db, "id", "apple", NOW, 1, "app_a");
+    insertChartRow(db, "id", "apple", NOW - 350 * DAY_MS, 1, "app_b");
+    const r = checkChartCoverage(db, ["id"]);
+    expect(r.status).toBe("FAIL");
+    expect(r.details).toContain("2d coverage (distinct days");
+  });
 });
 
 describe("checkRankDistribution", () => {

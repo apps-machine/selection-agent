@@ -1,10 +1,10 @@
 #!/usr/bin/env bun
 import { defineCommand, runMain } from "citty";
-import { runAudit } from "./audit.ts";
 import { runDemo } from "../demo/run-demo.ts";
 import type { JudgeClient } from "../judges/text-judge.ts";
 import type { ImageFetcher, VisionJudgeClient } from "../judges/vision-judge.ts";
 import { runSnapshot } from "../velocity/run-snapshot.ts";
+import { runAudit } from "./audit.ts";
 import { renderBanner, VERSION } from "./banner.ts";
 import { formatError } from "./errors.ts";
 
@@ -14,6 +14,25 @@ function parseList(v: unknown): string[] | undefined {
     .split(",")
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
+}
+
+/**
+ * Parse a comma-separated list of ISO alpha-2 market codes.
+ *
+ * Validates each token against /^[a-z]{2}$/. Throws on invalid tokens so the
+ * caller surface (e.g. the audit subcommand) can format a clean error and
+ * exit 2. Returns undefined when the flag is unset/empty so the caller can
+ * fall back to its default cluster.
+ */
+function parseMarkets(v: unknown): string[] | undefined {
+  const parsed = parseList(v);
+  if (!parsed) return undefined;
+  for (const token of parsed) {
+    if (!/^[a-z]{2}$/.test(token)) {
+      throw new Error(`invalid market code: ${token} (expected ISO alpha-2 lowercase)`);
+    }
+  }
+  return parsed;
 }
 
 function parseStores(v: unknown): ("apple" | "google")[] | undefined {
@@ -91,6 +110,11 @@ const main = defineCommand({
           description:
             "Comma-separated ISO alpha-2 market codes for chart-coverage checks (default: bd,th,vn,my,id — tier-2 SEA cluster)",
         },
+        metadata: {
+          type: "string",
+          description:
+            "Path to the metadata.jsonl[.gz] dossier file. If omitted, scans data/apptweak-*/metadata.jsonl{,.gz} (latest dated dir wins).",
+        },
         output: {
           type: "string",
           description:
@@ -104,7 +128,7 @@ const main = defineCommand({
           "./.cache/selection-agent.sqlite";
         let markets: string[] | undefined;
         try {
-          markets = parseList(args.markets);
+          markets = parseMarkets(args.markets);
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err);
           console.error(
@@ -119,8 +143,10 @@ const main = defineCommand({
           process.exit(2);
         }
         const output = typeof args.output === "string" && args.output ? args.output : undefined;
+        const metadataPath =
+          typeof args.metadata === "string" && args.metadata ? args.metadata : undefined;
         try {
-          const result = await runAudit({ dbPath, markets, output });
+          const result = await runAudit({ dbPath, markets, output, metadataPath });
           if (!output) {
             process.stdout.write(result.report);
           } else {

@@ -17,22 +17,23 @@
  */
 
 import { Database } from "bun:sqlite";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import pino from "pino";
+import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { gunzipSync } from "node:zlib";
+import pino from "pino";
 import { runMigrations } from "../storage/schema.ts";
 import {
   type CheckResult,
   type CheckStatus,
-  DEFAULT_AUDIT_MARKETS,
-  type MetadataSampleGroup,
-  type MetadataSampleReader,
   checkAppInvariantsCoverage,
   checkChartCoverage,
   checkMetadataPointInTime,
   checkRankDistribution,
   checkRecentDataWindow,
   checkSignalSnapshotsInventory,
+  DEFAULT_AUDIT_MARKETS,
+  type MetadataSampleGroup,
+  type MetadataSampleReader,
 } from "./runbook-audit-checks.ts";
 
 export interface AuditOpts {
@@ -46,6 +47,18 @@ export interface AuditOpts {
   now?: number;
   /** Inject a metadata sample reader (test seam). Defaults to the file-backed reader. */
   metadataReader?: MetadataSampleReader;
+  /**
+   * Explicit path to a `metadata.jsonl` (or `.jsonl.gz`) dossier. When set,
+   * the default reader uses this path verbatim; when unset, the default
+   * reader globs `data/apptweak-*` directories under `dataRoot` and picks
+   * the latest by directory name.
+   */
+  metadataPath?: string;
+  /**
+   * Root directory for the default metadata glob. Defaults to the process
+   * cwd. Exposed as a test seam so tests can point at a tmp dir.
+   */
+  dataRoot?: string;
   /** Suppress logger output (used by tests). */
   silent?: boolean;
 }
@@ -91,7 +104,9 @@ export async function runAudit(opts: AuditOpts = {}): Promise<AuditResult> {
   const db = new Database(dbPath);
   try {
     runMigrations(db);
-    const reader = opts.metadataReader ?? defaultMetadataReader();
+    const reader =
+      opts.metadataReader ??
+      defaultMetadataReader({ metadataPath: opts.metadataPath, dataRoot: opts.dataRoot });
     const results: CheckResult[] = [
       checkChartCoverage(db, markets),
       checkRankDistribution(db),
@@ -175,29 +190,29 @@ function countByStatus(results: CheckResult[]): Record<CheckStatus, number> {
 }
 
 /**
- * Default metadata point-in-time reader. Looks for `metadata.jsonl` (or
- * `metadata.jsonl.gz`) under any `data/apptweak-*` directory in the current
- * working tree and returns sample groups for triples with ≥2 t0 records.
+ * Default metadata point-in-time reader.
  *
- * If no metadata file is found, returns an empty list — the check itself
- * handles that case (WARN: cannot evaluate).
+ * Resolution strategy:
+ *   1. If `metadataPath` is provided, use it verbatim (gzip auto-detected by
+ *      `.gz` suffix).
+ *   2. Otherwise, scan `<dataRoot>/data/apptweak-*` directories, sort
+ *      lexicographically (so the latest YYYY-MM-DD wins), and pick the first
+ *      that contains `metadata.jsonl` or `metadata.jsonl.gz`.
+ *
+ * If no file is found, returns an empty list — the check itself handles that
+ * case (WARN: cannot evaluate). This avoids a hard fail on fresh clones that
+ * have no dossier and keeps the date-stamped private layout out of the
+ * published OSS artifact.
  */
-export function defaultMetadataReader(): MetadataSampleReader {
+export function defaultMetadataReader(
+  opts: { metadataPath?: string; dataRoot?: string } = {},
+): MetadataSampleReader {
   return (sampleSize: number): MetadataSampleGroup[] => {
-    const candidates = [
-      "data/apptweak-2026-05-04/metadata.jsonl",
-      "data/apptweak-2026-05-04/metadata.jsonl.gz",
-    ];
-    let raw: string | null = null;
-    for (const p of candidates) {
-      if (existsSync(p)) {
-        raw = p.endsWith(".gz")
-          ? gunzipSync(readFileSync(p)).toString("utf8")
-          : readFileSync(p, "utf8");
-        break;
-      }
-    }
-    if (!raw) return [];
+    const resolvedPath = resolveMetadataPath(opts);
+    if (!resolvedPath) return [];
+    const raw = resolvedPath.endsWith(".gz")
+      ? gunzipSync(readFileSync(resolvedPath)).toString("utf8")
+      : readFileSync(resolvedPath, "utf8");
 
     // Parse only the first 1000 lines to bound runtime (matches runbook bash
     // sample). We collect t0 + max release_date per (app_id, market, store).
@@ -243,4 +258,50 @@ export function defaultMetadataReader(): MetadataSampleReader {
     }
     return multi;
   };
+}
+
+/**
+ * Resolve the metadata file path:
+ *   - explicit `metadataPath` wins (auto-decompresses if `.gz`)
+ *   - else glob `<dataRoot>/data/apptweak-*` directories, sort by name desc,
+ *     return the first that has `metadata.jsonl[.gz]`
+ *   - else null (no dossier present)
+ *
+ * Exported for tests; not part of the package's public API surface.
+ */
+export function resolveMetadataPath(
+  opts: { metadataPath?: string; dataRoot?: string } = {},
+): string | null {
+  if (opts.metadataPath) {
+    return existsSync(opts.metadataPath) ? opts.metadataPath : null;
+  }
+  const root = opts.dataRoot ?? process.cwd();
+  const dataDir = join(root, "data");
+  if (!existsSync(dataDir)) return null;
+  let entries: string[];
+  try {
+    entries = readdirSync(dataDir);
+  } catch {
+    return null;
+  }
+  // Sort descending so the latest dated directory wins.
+  const candidates = entries
+    .filter((name) => name.startsWith("apptweak-"))
+    .filter((name) => {
+      try {
+        return statSync(join(dataDir, name)).isDirectory();
+      } catch {
+        return false;
+      }
+    })
+    .sort()
+    .reverse();
+  for (const name of candidates) {
+    const dir = join(dataDir, name);
+    const jsonl = join(dir, "metadata.jsonl");
+    if (existsSync(jsonl)) return jsonl;
+    const gz = join(dir, "metadata.jsonl.gz");
+    if (existsSync(gz)) return gz;
+  }
+  return null;
 }
