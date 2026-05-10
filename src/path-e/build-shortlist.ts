@@ -262,10 +262,7 @@ function filter1Durability(
   if (markets.length === 0) return [];
   const placeholders = markets.map(() => "?").join(",");
   return db
-    .prepare<
-      DurabilityRow,
-      [number, number, number, ...string[]]
-    >(
+    .prepare<DurabilityRow, [number, number, number, ...string[]]>(
       `SELECT app_id, store, market,
               COUNT(DISTINCT date(captured_at/1000, 'unixepoch')) AS days_in_top100,
               MIN(rank) AS best_rank,
@@ -295,9 +292,7 @@ function loadPublishers(db: Database): {
     .prepare<
       { app_id: string; store: Store; publisher_id: string | null; publisher_name: string | null },
       []
-    >(
-      `SELECT app_id, store, publisher_id, publisher_name FROM app_invariants`,
-    )
+    >(`SELECT app_id, store, publisher_id, publisher_name FROM app_invariants`)
     .all();
   const byApp = new Map<string, PublisherInfo>();
   const appCountByPub = new Map<string, number>();
@@ -565,7 +560,10 @@ export async function buildShortlist(opts: ShortlistOpts = {}): Promise<Shortlis
     });
     const metaByAppStore = readMetadata(metaPath);
     if (metaPath) {
-      logger.info({ uniqueAppStore: metaByAppStore.size, source: metaPath }, "loaded metadata.jsonl");
+      logger.info(
+        { uniqueAppStore: metaByAppStore.size, source: metaPath },
+        "loaded metadata.jsonl",
+      );
     } else {
       logger.warn("metadata.jsonl not found — every survivor will be dropped as no-meta");
     }
@@ -640,10 +638,7 @@ export async function buildShortlist(opts: ShortlistOpts = {}): Promise<Shortlis
     let llmDropped = 0;
     let llmUnparsed = 0;
     if (!skipLLM && candidates.length > 0 && opts.llmClient) {
-      logger.info(
-        { targets: candidates.length },
-        "running LLM clonability classifier",
-      );
+      logger.info({ targets: candidates.length }, "running LLM clonability classifier");
       await runLlmClassifier(candidates, opts.llmClient, llmConcurrency);
     }
 

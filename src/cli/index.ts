@@ -3,6 +3,7 @@ import { defineCommand, runMain } from "citty";
 import { runDemo } from "../demo/run-demo.ts";
 import type { JudgeClient } from "../judges/text-judge.ts";
 import type { ImageFetcher, VisionJudgeClient } from "../judges/vision-judge.ts";
+import { buildShortlist, defaultAnthropicLlmClient } from "../path-e/build-shortlist.ts";
 import { runSnapshot } from "../velocity/run-snapshot.ts";
 import { runAudit } from "./audit.ts";
 import { renderBanner, VERSION } from "./banner.ts";
@@ -162,6 +163,150 @@ const main = defineCommand({
               cause: "Audit threw before producing a report.",
               fix: "Check that the DB path is readable and that the schema matches the package version.",
               docs: "docs/runbooks/Runbook-Discovery.md § Stage 1",
+            }),
+          );
+          process.exit(1);
+        }
+      },
+    }),
+    shortlist: defineCommand({
+      meta: {
+        name: "shortlist",
+        description:
+          "Stage 2 Path E shortlist generator (Runbook-Discovery). Runs 5 sequential filters (durability, indie, mechanic, monetization, market spread) + optional LLM clonability classifier → ranked CSV/JSON shortlist of 30-50 candidate apps to clone.",
+      },
+      args: {
+        db: {
+          type: "string",
+          description:
+            "SQLite DB path (overrides $SELECTION_AGENT_DB; default ./.cache/selection-agent.sqlite)",
+        },
+        markets: {
+          type: "string",
+          description:
+            "Comma-separated ISO alpha-2 market codes (default: id,vn,th,my,bd — tier-2 SEA cluster)",
+        },
+        metadata: {
+          type: "string",
+          description:
+            "Path to the metadata.jsonl[.gz] dossier file. If omitted, scans data/apptweak-*/metadata.jsonl{,.gz} (latest dated dir wins).",
+        },
+        output: {
+          type: "string",
+          description:
+            "Directory for output artifacts. A timestamped subdirectory is created with shortlist.csv + shortlist.json. If omitted, no files are written.",
+        },
+        llm: {
+          type: "boolean",
+          description:
+            "Run the LLM clonability classifier (default: true). Pass --no-llm to skip judges and keep all dna-clonable candidates.",
+          default: true,
+        },
+        "shortlist-size": {
+          type: "string",
+          description: "Final shortlist size (default: 50)",
+        },
+      },
+      async run({ args }) {
+        const dbPath =
+          (typeof args.db === "string" && args.db) ||
+          process.env.SELECTION_AGENT_DB ||
+          "./.cache/selection-agent.sqlite";
+        let markets: string[] | undefined;
+        try {
+          markets = parseMarkets(args.markets);
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          console.error(
+            formatError({
+              code: "INVALID_MARKETS",
+              message,
+              cause: "--markets must be a comma-separated list of ISO alpha-2 codes.",
+              fix: "rerun with --markets id,vn,th,my,bd (default) or another cluster",
+              docs: "docs/runbooks/Runbook-Discovery.md § Stage 2",
+            }),
+          );
+          process.exit(2);
+        }
+        const metadataPath =
+          typeof args.metadata === "string" && args.metadata ? args.metadata : undefined;
+        const outputDir = typeof args.output === "string" && args.output ? args.output : undefined;
+        const noLlm = args.llm === false;
+        const rawSize =
+          typeof args["shortlist-size"] === "string" ? args["shortlist-size"] : undefined;
+        let finalShortlistSize: number | undefined;
+        if (rawSize !== undefined) {
+          finalShortlistSize = Number.parseInt(rawSize, 10);
+          if (!Number.isFinite(finalShortlistSize) || finalShortlistSize <= 0) {
+            console.error(
+              formatError({
+                code: "INVALID_SHORTLIST_SIZE",
+                message: `--shortlist-size must be a positive integer, got "${rawSize}"`,
+                cause: "The final shortlist is truncated to this many rows.",
+                fix: "rerun with --shortlist-size 50 (default) or another positive integer",
+                docs: "docs/runbooks/Runbook-Discovery.md § Stage 2",
+              }),
+            );
+            process.exit(2);
+          }
+        }
+        if (!noLlm && !process.env.ANTHROPIC_API_KEY) {
+          console.error(
+            formatError({
+              code: "MISSING_API_KEY",
+              message: "ANTHROPIC_API_KEY is required for the clonability classifier",
+              cause: "The LLM step rates each candidate's solo-clonability.",
+              fix: [
+                "1. Get a key: https://console.anthropic.com/settings/keys",
+                "2. Export it in your shell:",
+                "     export ANTHROPIC_API_KEY=sk-ant-api03-...",
+                "3. Re-run shortlist:",
+                "     npx @apps-machine/selection-agent shortlist",
+                "",
+                "Or skip the LLM step entirely:",
+                "     npx @apps-machine/selection-agent shortlist --no-llm",
+              ],
+              docs: "docs/runbooks/Runbook-Discovery.md § Stage 2",
+            }),
+          );
+          process.exit(2);
+        }
+        try {
+          const llmClient = noLlm ? undefined : await defaultAnthropicLlmClient({});
+          const result = await buildShortlist({
+            dbPath,
+            markets,
+            metadataPath,
+            outputDir,
+            skipLLM: noLlm,
+            llmClient,
+            finalShortlistSize,
+          });
+          process.stdout.write(
+            `Shortlist: ${result.shortlist.length} apps (from ${result.funnel.final_candidates} candidates).\n`,
+          );
+          process.stdout.write(
+            `Funnel: F1=${result.funnel.f1_post_durability} → rollup=${result.funnel.f1_post_rollup_app_store_pairs} → F5=${result.funnel.f5_post_market_spread} → meta-matched=${result.funnel.f1_post_rollup_app_store_pairs - result.funnel.dropped_no_meta - result.funnel.dropped_no_pub} → clonable=${result.funnel.final_candidates}\n`,
+          );
+          if (!noLlm) {
+            process.stdout.write(
+              `LLM: ${result.funnel.llm_kept} CLONE, ${result.funnel.llm_dropped} SKIP, ${result.funnel.llm_unparsed} unparsed.\n`,
+            );
+          }
+          if (result.csvPath) {
+            process.stdout.write(`Wrote ${result.csvPath}\n`);
+            process.stdout.write(`Wrote ${result.jsonPath}\n`);
+          }
+          process.exit(0);
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          console.error(
+            formatError({
+              code: "SHORTLIST_FAILED",
+              message,
+              cause: "buildShortlist threw before producing a shortlist.",
+              fix: "Check the DB path, the metadata.jsonl path, and (if not --no-llm) your ANTHROPIC_API_KEY.",
+              docs: "docs/runbooks/Runbook-Discovery.md § Stage 2",
             }),
           );
           process.exit(1);
