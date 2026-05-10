@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 import { defineCommand, runMain } from "citty";
+import { runAudit } from "./audit.ts";
 import { runDemo } from "../demo/run-demo.ts";
 import type { JudgeClient } from "../judges/text-judge.ts";
 import type { ImageFetcher, VisionJudgeClient } from "../judges/vision-judge.ts";
@@ -73,6 +74,74 @@ const main = defineCommand({
       "Apps Machine Selection Agent — ranks app opportunities globally via dual-store scraping + Claude judges.",
   },
   subCommands: {
+    audit: defineCommand({
+      meta: {
+        name: "audit",
+        description:
+          "Stage 1 pre-flight data audit (Runbook-Discovery). Runs 6 checks against the cache DB and emits a Markdown report. Exits 1 on FAIL.",
+      },
+      args: {
+        db: {
+          type: "string",
+          description:
+            "SQLite DB path (overrides $SELECTION_AGENT_DB; default ./.cache/selection-agent.sqlite)",
+        },
+        markets: {
+          type: "string",
+          description:
+            "Comma-separated ISO alpha-2 market codes for chart-coverage checks (default: bd,th,vn,my,id — tier-2 SEA cluster)",
+        },
+        output: {
+          type: "string",
+          description:
+            "Write the markdown report to this path. If omitted, the report goes to stdout.",
+        },
+      },
+      async run({ args }) {
+        const dbPath =
+          (typeof args.db === "string" && args.db) ||
+          process.env.SELECTION_AGENT_DB ||
+          "./.cache/selection-agent.sqlite";
+        let markets: string[] | undefined;
+        try {
+          markets = parseList(args.markets);
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          console.error(
+            formatError({
+              code: "INVALID_MARKETS",
+              message,
+              cause: "--markets must be a comma-separated list of ISO alpha-2 codes.",
+              fix: "rerun with --markets bd,th,vn,my,id (default) or another cluster",
+              docs: "docs/runbooks/Runbook-Discovery.md § Stage 1",
+            }),
+          );
+          process.exit(2);
+        }
+        const output = typeof args.output === "string" && args.output ? args.output : undefined;
+        try {
+          const result = await runAudit({ dbPath, markets, output });
+          if (!output) {
+            process.stdout.write(result.report);
+          } else {
+            process.stdout.write(`Audit report written to ${output}\n`);
+          }
+          process.exit(result.exitCode);
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          console.error(
+            formatError({
+              code: "AUDIT_FAILED",
+              message,
+              cause: "Audit threw before producing a report.",
+              fix: "Check that the DB path is readable and that the schema matches the package version.",
+              docs: "docs/runbooks/Runbook-Discovery.md § Stage 1",
+            }),
+          );
+          process.exit(1);
+        }
+      },
+    }),
     demo: defineCommand({
       meta: {
         name: "demo",
